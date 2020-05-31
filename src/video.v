@@ -16,6 +16,7 @@ module video (
   input         cpu_clk,
   input [13:0]  font_addr,
   input [13:0]  name_table_addr,
+  output        n_int,
   output reg [7:0]  diag
 );
 
@@ -39,12 +40,20 @@ module video (
   reg [9:0] hc = 0;
   reg [9:0] vc = 0;
 
+  reg INT = 0;
+  reg[5:0] intCnt = 1;
+
+  assign n_int = !INT;
+
   always @(posedge clk) begin
     if (hc == HT - 1) begin
       hc <= 0;
       if (vc == VT - 1) vc <= 0;
       else vc <= vc + 1;
     end else hc <= hc + 1;
+    if (hc == HA + HFP && vc == VA + VFP) INT <= 1;
+    if (INT) intCnt <= intCnt + 1;
+    if (!intCnt) INT <= 0;
   end
 
   assign vga_hs = !(hc >= HA + HFP && hc < HA + HFP + HS);

@@ -1,5 +1,5 @@
 `default_nettype none
-module trs80 (
+module msx (
   input         clk25_mhz,
   // Buttons
   input [6:0]   btn,
@@ -82,8 +82,9 @@ module trs80 (
   wire          n_IORQ;
   wire          n_M1;
   wire          n_kbdCS;
-  
-  reg [3:0]     sound;
+  wire          n_int;
+
+  reg [3:0]     sound = 0;
 
   reg [2:0]     cpuClockCount;
   wire          cpuClock;
@@ -129,7 +130,7 @@ module trs80 (
     //.clk(cpuClock), // turbo mode 28MHz
     .clk(cpuClockEnable), // normal mode 3.5MHz
     .wait_n(1'b1),
-    .int_n(1'b1),
+    .int_n(n_int),
     .nmi_n(1'b1),
     .busrq_n(1'b1),
     .mreq_n(n_MREQ),
@@ -175,11 +176,12 @@ module trs80 (
 
   wire pause, scroll, reso;
   wire [7:0] f_keys;
-  wire [7:0] ppi_port_a, ppi_port_b, ppi_port_c;
+  reg [7:0] ppi_port_a, ppi_port_c;
+  wire [7:0] ppi_port_b;
 
   keyboard key_board (
     .clk(clk),
-    .reset(1'b0),
+    .reset(!n_hard_reset),
     .clk_ena(1'b1),
     .k_map(1'b1), // English
     .pause(pause),
@@ -260,6 +262,7 @@ module trs80 (
     .cpu_clk(cpuClock),
     .font_addr(font_addr),
     .name_table_addr(name_table_addr),
+    .n_int(n_int),
     .diag(vga_diag)
   );
 
@@ -324,7 +327,8 @@ module trs80 (
   wire led3 = 0;
   wire led4 = !n_hard_reset;
 
-  assign leds = {led4, led3, led2, led1};
+  //assign leds = {led4, led3, led2, led1};
+  assign leds = ppi_port_b;
 
   always @(posedge cpuClock) diag16 <= ps2_key;
 
