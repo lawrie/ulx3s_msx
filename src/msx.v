@@ -28,7 +28,7 @@ module msx (
 
   inout  [27:0] gp,gn,
   // Leds
-  output [7:0]  leds
+  output reg [7:0]  leds
 );
 
   assign wifi_gpio0 = 0;
@@ -98,12 +98,12 @@ module msx (
   // ===============================================================
   // System Clock generation
   // ===============================================================
-  wire clk125, clk;
+  wire clk_hdmi, clk_vga;
 
   pll pll_i (
     .clkin(clk25_mhz),
-    .clkout0(clk125),
-    .clkout1(clk),
+    .clkout0(clk_hdmi),
+    .clkout1(clk_vga),
     .clkout2(cpuClock)
   );
 
@@ -113,7 +113,7 @@ module msx (
   reg [15:0] pwr_up_reset_counter = 0;
   wire       pwr_up_reset_n = &pwr_up_reset_counter;
 
-  always @(posedge clk) begin
+  always @(posedge cpuClock) begin
      if (!pwr_up_reset_n)
        pwr_up_reset_counter <= pwr_up_reset_counter + 1;
   end
@@ -166,7 +166,7 @@ module msx (
 
     // Get PS/2 keyboard events
   ps2 ps2_kbd (
-     .clk(clk),
+     .clk(cpuClock),
      .ps2_clk(ps2Clk),
      .ps2_data(ps2Data),
      .ps2_key(ps2_key)
@@ -178,9 +178,10 @@ module msx (
   wire [7:0] f_keys;
   reg [7:0] ppi_port_a, ppi_port_c;
   wire [7:0] ppi_port_b;
+  wire [7:0] key_diag;
 
   keyboard key_board (
-    .clk(clk),
+    .clk(cpuClock),
     .reset(!n_hard_reset),
     .clk_ena(1'b1),
     .k_map(1'b1), // English
@@ -190,7 +191,8 @@ module msx (
     .f_keys(f_keys),
     .ps2_key(ps2_key),
     .ppi_port_c(ppi_port_c),
-    .p_key_x(ppi_port_b)
+    .p_key_x(ppi_port_b),
+    .diag(key_diag)
   );
 
   // pull-ups for us2 connector 
@@ -200,8 +202,6 @@ module msx (
   // ===============================================================
   // VGA
   // ===============================================================
-  wire        clk_vga = clk;
-  wire        clk_hdmi = clk125;
   wire        vga_de;
   wire [7:0]  vga_din = cpuDataOut;
   wire [7:0]  vga_dout;
@@ -328,7 +328,7 @@ module msx (
   wire led4 = !n_hard_reset;
 
   //assign leds = {led4, led3, led2, led1};
-  assign leds = ppi_port_b;
+  always @(posedge cpuClock) if (ppi_port_b != 8'hff && ppi_port_c[3:0] == 6) leds = ppi_port_b;
 
   always @(posedge cpuClock) diag16 <= ps2_key;
 
