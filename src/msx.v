@@ -31,7 +31,19 @@ module msx (
   output reg [7:0]  leds
 );
 
+  parameter c_vga_out = 0;
+  parameter c_diag = 1;
+
+  // Used for interrupt to ESP32
   assign wifi_gpio0 = 0;
+
+  // pull-ups for us2 connector 
+  assign usb_fpga_pu_dp = 1;
+  assign usb_fpga_pu_dn = 1;
+  
+  // passthru to ESP32 micropython serial console
+  assign wifi_rxd = ftdi_txd;
+  assign ftdi_rxd = wifi_txd;
 
   // VGA (should be assigned to some gp/gn outputs
   wire   [3:0]  red;
@@ -40,8 +52,6 @@ module msx (
   wire          hSync;
   wire          vSync;
   
-  parameter c_vga_out = 0;
-
   generate
     genvar i;
     if (c_vga_out) begin
@@ -59,12 +69,13 @@ module msx (
 
   generate 
     genvar i;
-    for(i = 0; i < 4; i = i+1)
-    begin
-      assign gn[17-i] = diag16[8+i];
-      assign gp[17-i] = diag16[12+i];
-      assign gn[24-i] = diag16[i];
-      assign gp[24-i] = diag16[4+i];
+    if (c_diag) begin
+      for(i = 0; i < 4; i = i+1) begin
+        assign gn[17-i] = diag16[8+i];
+        assign gp[17-i] = diag16[12+i];
+        assign gn[24-i] = diag16[i];
+        assign gp[24-i] = diag16[4+i];
+      end
     end
   endgenerate
   
@@ -90,10 +101,6 @@ module msx (
   wire          cpuClock;
   wire          cpuClockEnable;
   wire [7:0]    ramOut;
-
-  // passthru to ESP32 micropython serial console
-  assign wifi_rxd = ftdi_txd;
-  assign ftdi_rxd = wifi_txd;
 
   // ===============================================================
   // System Clock generation
@@ -152,7 +159,7 @@ module msx (
   )
   ram64 (
     .clk(cpuClock),
-    .we(!n_memWR && cpuAddress >= 16'h8000),
+    .we(!n_memWR),
     .addr(cpuAddress),
     .din(cpuDataOut),
     .dout(ramOut)
@@ -161,7 +168,6 @@ module msx (
   // ===============================================================
   // Keyboard
   // ===============================================================
-  wire [7:0]  key_data;
   wire [10:0] ps2_key;
 
     // Get PS/2 keyboard events
@@ -173,12 +179,12 @@ module msx (
   );
 
   // Keyboard matrix
-
-  wire pause, scroll, reso;
+  wire       pause, scroll, reso;
   wire [7:0] f_keys;
-  reg [7:0] ppi_port_a, ppi_port_c;
   wire [7:0] ppi_port_b;
   wire [7:0] key_diag;
+  reg [7:0]  ppi_port_a;
+  reg [7:0]  ppi_port_c;
 
   keyboard key_board (
     .clk(cpuClock),
@@ -195,10 +201,6 @@ module msx (
     .diag(key_diag)
   );
 
-  // pull-ups for us2 connector 
-  assign usb_fpga_pu_dp = 1;
-  assign usb_fpga_pu_dn = 1;
-  
   // ===============================================================
   // VGA
   // ===============================================================
@@ -207,14 +209,14 @@ module msx (
   wire [7:0]  vga_dout;
   reg  [13:0] vga_addr;
   wire        vga_wr = cpuAddress[7:0] == 8'h98 && n_ioWR == 1'b0;
-  reg  [1:0]  mode = 0;
+  wire        vga_rd = cpuAddress[7:0] == 8'h98 && n_ioRD == 1'b0;
   reg         is_second_addr_byte = 0;
   reg [7:0]   first_addr_byte;
   reg         r_n_ioWR;
-  reg [13:0]  start_vga;
   reg [7:0]   r_vdp [0:7];
-  reg [13:0]  font_addr = 14'h0800;
-  reg [13:0]  name_table_addr = 14'h0;
+  wire  [1:0]  mode = r_vdp[4] ? 0 : 1;
+  wire [13:0]  font_addr = r_vdp[4] * 2048;
+  wire [13:0]  name_table_addr = r_vdp[2] * 1024;
   wire [7:0]  vga_diag;
 
   always @(posedge cpuClock) begin
@@ -226,7 +228,6 @@ module msx (
         if (is_second_addr_byte) begin
 	  if (!cpuDataOut[7]) begin
             vga_addr <=  {cpuDataOut[5:0], first_addr_byte};
-            start_vga <=  {cpuDataOut[5:0], first_addr_byte};
           end else begin
             if (cpuDataOut[5:0] < 8) begin
               r_vdp[cpuDataOut[5:0]] <= first_addr_byte;
@@ -241,8 +242,8 @@ module msx (
         ppi_port_a <= cpuDataOut;
       if (cpuAddress[7:0] == 8'haa && n_ioWR == 1'b0)
         ppi_port_c <= cpuDataOut;
-      if (cpuAddress[7:0] == 8'hab && n_ioWR == 1'b0)
-        ppi_port_c[cpuAddress[3:1]] <= cpuAddress[0];
+      if (cpuAddress[7:0] == 8'hab && n_ioWR == 1'b0 && !cpuDataOut[7])
+        ppi_port_c[cpuDataOut[3:1]] <= cpuDataOut[0];
     end
   end
       
@@ -257,12 +258,13 @@ module msx (
     .vga_addr(vga_addr),
     .vga_din(vga_din),
     .vga_dout(vga_dout),
-    .vga_wr(vga_wr),
+    .vga_wr(vga_wr & cpuClockEnable && !cpuClockEnable1),
     .mode(mode),
     .cpu_clk(cpuClock),
     .font_addr(font_addr),
     .name_table_addr(name_table_addr),
     .n_int(n_int),
+    .video_on(r_vdp[1][6]),
     .diag(vga_diag)
   );
 
@@ -284,29 +286,27 @@ module msx (
   // MEMORY READ/WRITE LOGIC
   // ===============================================================
 
-  assign n_ioWR = n_WR | n_IORQ;
+  assign n_ioWR  = n_WR | n_IORQ;
   assign n_memWR = n_WR | n_MREQ;
-  assign n_ioRD = n_RD | n_IORQ;
+  assign n_ioRD  = n_RD | n_IORQ;
   assign n_memRD = n_RD | n_MREQ;
-
-  // ===============================================================
-  // Chip selects
-  // ===============================================================
-
-  assign n_kbdCS = !(cpuAddress[7:0] == 8'ha9);
 
   // ===============================================================
   // Memory decoding
   // ===============================================================
 
-  assign cpuDataIn =  n_kbdCS == 1'b0 && n_ioRD == 1'b0 ? ppi_port_b :
+  assign cpuDataIn =  cpuAddress[7:0] == 8'ha8 && n_ioRD == 1'b0 ? ppi_port_a :
+                      cpuAddress[7:0] == 8'ha9 && n_ioRD == 1'b0 ? ppi_port_b :
+                      cpuAddress[7:0] == 8'haa && n_ioRD == 1'b0 ? ppi_port_c :
                       ramOut;
   
   // ===============================================================
   // CPU clock enable
   // ===============================================================
-   
+  
+  reg cpuClockEnable1; 
   always @(posedge cpuClock) begin
+    cpuClockEnable1 <= cpuClockEnable;
     cpuClockCount <= cpuClockCount + 1;
   end
 
@@ -315,7 +315,6 @@ module msx (
   // ===============================================================
   // Audio
   // ===============================================================
-
   assign audio_l = sound;
   assign audio_r = sound;
 
@@ -328,8 +327,8 @@ module msx (
   wire led4 = !n_hard_reset;
 
   //assign leds = {led4, led3, led2, led1};
-  always @(posedge cpuClock) if (ppi_port_b != 8'hff && ppi_port_c[3:0] == 6) leds = ppi_port_b;
+  assign leds = r_vdp[1];
 
-  always @(posedge cpuClock) diag16 <= ps2_key;
+  always @(posedge cpuClock) if (vga_wr && vga_addr == 23) diag16 <= {cpuClockEnable, cpuClockEnable1, vga_dout};
 
 endmodule

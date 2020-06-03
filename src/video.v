@@ -17,6 +17,7 @@ module video (
   input [13:0]  font_addr,
   input [13:0]  name_table_addr,
   output        n_int,
+  input         video_on,
   output reg [7:0]  diag
 );
 
@@ -27,7 +28,7 @@ module video (
   parameter HT  = HA + HS + HFP + HBP;
   parameter HB = 80;
   parameter HB2 = HB/2;
-  parameter HBadj = 12;
+  parameter HBadj = 0;
 
   parameter VA = 480;
   parameter VS  = 2;
@@ -87,7 +88,7 @@ module video (
   reg [7:0] r_char;
   reg [7:0] font_line;
 
-  always @(posedge clk) begin
+  always @(posedge clk) if (video_on) begin
     if (mode == 0) begin
       if (hc[0] == 1) begin
         x_pix <= x_pix + 1;
@@ -112,13 +113,37 @@ module video (
         x_pix <= 0;
         x_char <= 63;
       end
+    end else if (mode == 1) begin
+      if (hc[0] == 1) begin
+        x_pix <= x_pix + 1;
+        if (x_pix == 7) begin
+          x_pix <= 0;
+	  x_char <= x_char + 1;
+        end
+        if (x_pix == 3) begin
+          // Set address for next character
+          vid_addr <= name_table_addr + (y[7:3] * 32 + x_char + 1);
+        end else if (x_pix == 4) begin
+          // Set address for font line
+          vid_addr <= font_addr + {vid_out, y[2:0]};
+        end else if (x_pix == 5) begin
+          // Store the font line ready for next character
+          font_line <= vid_out;
+        end
+      end
+
+      // Get ready for start of line
+      if (hc == HB - 17) begin
+        x_pix <= 0;
+        x_char <= 63;
+      end
     end
   end
  
   wire pixel = font_line[7 - x_pix];
   wire pix = ~border & pixel;
 
-  wire [3:0] red = {4{pix}};
+  wire [3:0] red = border ? 4'b1111 : {4{pix}};
   wire [3:0] green = {4{pix}};
   wire [3:0] blue = {4{pix}};
 
