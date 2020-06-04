@@ -20,7 +20,7 @@ module keyboard (
   reg        r_pause;
   reg        r_scroll;
   reg        r_reso;
-  reg [7:0]  o_f_keys;
+  reg [7:0]  o_f_keys = 0;
   reg        ps2_shift;
   reg        ps2_v_shift;
   wire [7:0]  o_key_col;
@@ -73,7 +73,7 @@ module keyboard (
 	        p_key_x[i] <= !o_key_col[i];
 	      end
               if (ppi_port_c[3:0] == 4'b0110) begin
-                p_key_x[0] <= !((!k_map && o_key_col[0]) || (k_map && ps2_v_shift));  
+                p_key_x[0] <= !((!k_map && o_key_col[0]) || (k_map && ps2_shift));  
               end else begin
                 p_key_x[0] <= !o_key_col[0];
               end
@@ -122,48 +122,41 @@ module keyboard (
     end
 
     if (ps2_key[10]) begin
-      if (ps2_dat == 8'h77 && ps2_ext) begin // pause/break
+      ps2_chg <= 1;
+
+      // Keys available to control the core
+      if (ps2_dat == 8'h77 && ps2_ext) begin // pause/break (not working)
         if (!ps2_brk)
           r_pause <= !r_pause;
+        ps2_chg <= 0;
       end else if (ps2_dat == 8'h7c && ps2_ext) begin // print screen
         if (!ps2_brk) 
 	  r_reso <= !r_reso;
-        ps2_chg <= 1;
       end else if (ps2_dat == 8'h7d && ps2_ext) begin // PgUp
         if (!ps2_brk) 
           o_f_keys[5] <= !o_f_keys[5];
-        ps2_chg <= 1;
       end else if (ps2_dat == 8'h7a && ps2_ext) begin // PgDn
         if (!ps2_brk) 
           o_f_keys[4] <= !o_f_keys[4];
-        ps2_chg <= 1;
       end else if (ps2_dat == 8'h01 && !ps2_ext) begin // F9
         if (!ps2_brk) 
           o_f_keys[3] <= !o_f_keys[3];
-        ps2_chg <= 1;
       end else if (ps2_dat == 8'h09 && !ps2_ext) begin // F10
         if (!ps2_brk) 
           o_f_keys[2] <= !o_f_keys[2];
-        ps2_chg <= 1;
       end else if (ps2_dat == 8'h78 && !ps2_ext) begin // F11
         if (!ps2_brk) 
           o_f_keys[1] <= !o_f_keys[1];
-        ps2_chg <= 1;
       end else if (ps2_dat == 8'h07 && !ps2_ext) begin // F12
         if (!ps2_brk) 
           o_f_keys[0] <= !o_f_keys[0];
-        ps2_chg <= 1;
       end else if (ps2_dat == 8'h7e && !ps2_ext) begin // Scroll lock
         if (!ps2_brk) 
           r_scroll <= !r_scroll;
-        ps2_chg <= 1;
       end else if ((ps2_dat == 8'h12 || ps2_dat == 8'h59) && !ps2_ext) begin // Shift
 	o_f_keys[7] <= !ps2_brk;
 	ps2_shift <= !ps2_brk;
-        ps2_chg <= 1;
-      end else begin
-        ps2_chg <= 1;
-      end
+      end 
     end
   end
 

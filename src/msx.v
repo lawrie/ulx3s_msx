@@ -136,7 +136,7 @@ module msx (
     .reset_n(n_hard_reset),
     //.clk(cpuClock), // turbo mode 28MHz
     .clk(cpuClockEnable), // normal mode 3.5MHz
-    .wait_n(1'b1),
+    .wait_n(!scroll),
     .int_n(n_int),
     .nmi_n(1'b1),
     .busrq_n(1'b1),
@@ -212,18 +212,19 @@ module msx (
   wire        vga_rd = cpuAddress[7:0] == 8'h98 && n_ioRD == 1'b0;
   reg         is_second_addr_byte = 0;
   reg [7:0]   first_addr_byte;
-  reg         r_n_ioWR;
   reg [7:0]   r_vdp [0:7];
-  wire  [1:0]  mode = r_vdp[4] ? 0 : 1;
-  wire [13:0]  font_addr = r_vdp[4] * 2048;
-  wire [13:0]  name_table_addr = r_vdp[2] * 1024;
+  wire [1:0]  mode = r_vdp[4] ? 0 : 1;
+  wire [13:0] font_addr = r_vdp[4] * 2048;
+  wire [13:0] name_table_addr = r_vdp[2] * 1024;
   wire [7:0]  vga_diag;
+  reg         cpuClockEnable1; 
+  wire        cpuClockEdge = cpuClockEnable && !cpuClockEnable1;
 
   always @(posedge cpuClock) begin
-    if (cpuClockEnable) begin
-      r_n_ioWR <= n_ioWR;
-      if (vga_wr && r_n_ioWR == 1'b1) vga_addr <= vga_addr + 1;
-      if (cpuAddress[7:0] == 8'h99 && n_ioWR == 1'b0 && r_n_ioWR == 1'b1) begin
+    if (cpuClockEdge) begin
+      // VDP interface
+      if (vga_wr || vga_rd) vga_addr <= vga_addr + 1;
+      if (cpuAddress[7:0] == 8'h99 && n_ioWR == 1'b0) begin
         is_second_addr_byte <= ~is_second_addr_byte;
         if (is_second_addr_byte) begin
 	  if (!cpuDataOut[7]) begin
@@ -258,7 +259,8 @@ module msx (
     .vga_addr(vga_addr),
     .vga_din(vga_din),
     .vga_dout(vga_dout),
-    .vga_wr(vga_wr & cpuClockEnable && !cpuClockEnable1),
+    .vga_wr(vga_wr && cpuClockEdge),
+    .vga_rd(vga_rd && cpuClockEdge),
     .mode(mode),
     .cpu_clk(cpuClock),
     .font_addr(font_addr),
@@ -298,13 +300,13 @@ module msx (
   assign cpuDataIn =  cpuAddress[7:0] == 8'ha8 && n_ioRD == 1'b0 ? ppi_port_a :
                       cpuAddress[7:0] == 8'ha9 && n_ioRD == 1'b0 ? ppi_port_b :
                       cpuAddress[7:0] == 8'haa && n_ioRD == 1'b0 ? ppi_port_c :
+		      cpuAddress[7:0] == 8'h98 && n_ioRD == 1'b0 ? vga_din :
                       ramOut;
   
   // ===============================================================
   // CPU clock enable
   // ===============================================================
   
-  reg cpuClockEnable1; 
   always @(posedge cpuClock) begin
     cpuClockEnable1 <= cpuClockEnable;
     cpuClockCount <= cpuClockCount + 1;
@@ -326,9 +328,8 @@ module msx (
   wire led3 = 0;
   wire led4 = !n_hard_reset;
 
-  //assign leds = {led4, led3, led2, led1};
-  assign leds = r_vdp[1];
+  assign leds = {led4, led3, led2, led1};
 
-  always @(posedge cpuClock) if (vga_wr && vga_addr == 23) diag16 <= {cpuClockEnable, cpuClockEnable1, vga_dout};
+  always @(posedge cpuClock) diag16 <= 0;
 
 endmodule
