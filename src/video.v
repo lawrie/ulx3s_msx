@@ -29,7 +29,7 @@ module video (
   parameter HT  = HA + HS + HFP + HBP;
   parameter HB = 80;
   parameter HB2 = HB/2;
-  parameter HBadj = 0;
+  parameter HBadj = 12;
 
   parameter VA = 480;
   parameter VS  = 2;
@@ -145,7 +145,7 @@ module video (
   wire pixel = font_line[7 - x_pix];
   wire pix = ~border & pixel;
 
-  wire [3:0] red = border ? 4'b1111 : {4{pix}};
+  wire [3:0] red = {4{pix}};
   wire [3:0] green = {4{pix}};
   wire [3:0] blue = {4{pix}};
 

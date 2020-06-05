@@ -205,7 +205,6 @@ module msx (
   // VGA
   // ===============================================================
   wire        vga_de;
-  wire [7:0]  vga_din = cpuDataOut;
   wire [7:0]  vga_dout;
   reg  [13:0] vga_addr;
   wire        vga_wr = cpuAddress[7:0] == 8'h98 && n_ioWR == 1'b0;
@@ -217,13 +216,18 @@ module msx (
   wire [13:0] font_addr = r_vdp[4] * 2048;
   wire [13:0] name_table_addr = r_vdp[2] * 1024;
   wire [7:0]  vga_diag;
+  reg         r_vga_rd;
   reg         cpuClockEnable1; 
   wire        cpuClockEdge = cpuClockEnable && !cpuClockEnable1;
 
   always @(posedge cpuClock) begin
     if (cpuClockEdge) begin
       // VDP interface
-      if (vga_wr || vga_rd) vga_addr <= vga_addr + 1;
+      if (vga_wr) vga_addr <= vga_addr + 1;
+      // Increment address on CPU cycle after IO read
+      r_vga_rd <= vga_rd;
+      if (r_vga_rd && !vga_rd) vga_addr <= vga_addr + 1;
+
       if (cpuAddress[7:0] == 8'h99 && n_ioWR == 1'b0) begin
         is_second_addr_byte <= ~is_second_addr_byte;
         if (is_second_addr_byte) begin
@@ -257,7 +261,7 @@ module msx (
     .vga_hs(hSync),
     .vga_vs(vSync),
     .vga_addr(vga_addr),
-    .vga_din(vga_din),
+    .vga_din(cpuDataOut),
     .vga_dout(vga_dout),
     .vga_wr(vga_wr && cpuClockEdge),
     .vga_rd(vga_rd && cpuClockEdge),
@@ -300,7 +304,7 @@ module msx (
   assign cpuDataIn =  cpuAddress[7:0] == 8'ha8 && n_ioRD == 1'b0 ? ppi_port_a :
                       cpuAddress[7:0] == 8'ha9 && n_ioRD == 1'b0 ? ppi_port_b :
                       cpuAddress[7:0] == 8'haa && n_ioRD == 1'b0 ? ppi_port_c :
-		      cpuAddress[7:0] == 8'h98 && n_ioRD == 1'b0 ? vga_din :
+		      cpuAddress[7:0] == 8'h98 && n_ioRD == 1'b0 ? vga_dout :
                       ramOut;
   
   // ===============================================================
@@ -330,6 +334,6 @@ module msx (
 
   assign leds = {led4, led3, led2, led1};
 
-  always @(posedge cpuClock) diag16 <= 0;
+  always @(posedge cpuClock) if (vga_rd && vga_addr < 14'h800 && vga_dout != 8'h20) diag16 <= vga_dout;
 
 endmodule
