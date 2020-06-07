@@ -334,6 +334,6 @@ module msx (
 
   assign leds = {led4, led3, led2, led1};
 
-  always @(posedge cpuClock) if (vga_rd && vga_addr < 14'h800 && vga_dout != 8'h20) diag16 <= vga_dout;
+  always @(posedge cpuClock) diag16 <= ps2_key;
 
 endmodule

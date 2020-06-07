@@ -68,7 +68,7 @@ module video (
   reg [5:0] x_char;
   reg [2:0] x_pix;
 
-  wire hBorder = (hc < (HB + HBadj) || hc >= HA - (HB + HBadj));
+  wire hBorder = (hc < (HB + HBadj) || hc >= HA - HB);
   wire vBorder = (vc < VB || vc >= VA - VB);
   wire border = hBorder || vBorder;
 

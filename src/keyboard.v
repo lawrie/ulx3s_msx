@@ -16,13 +16,12 @@ module keyboard (
   output [7:0] diag
 );
 
-  reg [2:0]  mtx_seq = 0;
+  reg [2:0]  mtx_state = 0;
   reg        r_pause;
   reg        r_scroll;
   reg        r_reso;
   reg [7:0]  o_f_keys = 0;
   reg        ps2_shift;
-  reg        ps2_v_shift;
   wire [7:0]  o_key_col;
   reg [7:0]  i_key_col;
 
@@ -56,64 +55,64 @@ module keyboard (
     if (reset) begin
       p_key_x <= 8'hff;
     end else if (clk_ena) begin
-      case (mtx_seq) 
+      // Key matrix state machine
+      case (mtx_state) 
         Mtx_Idle:
 	  begin
             if (ps2_chg) begin
               if (k_map) begin // English
-                mtx_seq <= Mtx_Settle;
-		mtx_idx <= {1'b0, !ps2_shift, key_id};
+                mtx_state <= Mtx_Settle;
+		mtx_idx <= {2'b00, key_id};
               end else begin // Japanese
-                mtx_seq <= Mtx_Read;
+                mtx_state <= Mtx_Read;
 		mtx_idx <= {2'b10, key_id};
               end
 	      p_key_x <= 8'hff;
             end else begin
+              // Return the matrix when in idle state
 	      for (i=0; i<8; i=i+1) begin
 	        p_key_x[i] <= !o_key_col[i];
 	      end
-              if (ppi_port_c[3:0] == 4'b0110) begin
-                p_key_x[0] <= !((!k_map && o_key_col[0]) || (k_map && ps2_shift));  
-              end else begin
-                p_key_x[0] <= !o_key_col[0];
-              end
+	      // Special case for shift key
+              if (k_map && ppi_port_c[3:0] == 4'b0110)
+                p_key_x[0] <= !ps2_shift;  
 	      key_row <= {4'b0, ppi_port_c[3:0]};
             end
           end
         Mtx_Settle:
           begin
-            mtx_seq <= Mtx_Clean;
+            mtx_state <= Mtx_Clean;
             key_we <= 0;
+	    // mtx_ptr now has col, row
 	    key_row <= {4'b0, mtx_ptr[3:0]};
           end
         Mtx_Clean:
           begin
-            mtx_seq <= Mtx_Read;
+            mtx_state <= Mtx_Read;
+	    // Unset bit for selected column
 	    key_we <= 1;
 	    i_key_col <= o_key_col;
 	    i_key_col[mtx_ptr[6:4]] <= 0;
-	    mtx_idx <= {1'b0, ps2_shift, key_id};
+	    mtx_idx <= {2'b0, key_id};
           end
 	Mtx_Read:
           begin
-            mtx_seq <= Mtx_Write;
+            mtx_state <= Mtx_Write;
+	    // Read current row value into o_key_col
 	    key_we <= 0;
 	    key_row <= {4'b0, mtx_ptr[3:0]};
-	    if (!ps2_brk)
-              ps2_v_shift <= mtx_ptr[7];
-            else
-              ps2_v_shift <= ps2_shift;
           end
 	Mtx_Write:
           begin
-            mtx_seq <= Mtx_End;
+            mtx_state <= Mtx_End;
+	    // Set bit into i_key_col and write it back
 	    key_we <= 1;
 	    i_key_col <= o_key_col;
 	    i_key_col[mtx_ptr[6:4]] <= !ps2_brk;
           end
 	Mtx_End:
           begin
-            mtx_seq <= Mtx_Idle;
+            mtx_state <= Mtx_Idle;
 	    key_we <= 0;
 	    key_row <= {4'b0, ppi_port_c[3:0]};
 	    ps2_chg <= 0;
@@ -156,6 +155,7 @@ module keyboard (
       end else if ((ps2_dat == 8'h12 || ps2_dat == 8'h59) && !ps2_ext) begin // Shift
 	o_f_keys[7] <= !ps2_brk;
 	ps2_shift <= !ps2_brk;
+	ps2_chg <= 0;
       end 
     end
   end
