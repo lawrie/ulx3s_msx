@@ -22,6 +22,7 @@ module keyboard (
   reg        r_reso;
   reg [7:0]  o_f_keys = 0;
   reg        ps2_shift;
+  reg        ps2_ctrl;
   wire [7:0]  o_key_col;
   reg [7:0]  i_key_col;
 
@@ -75,7 +76,9 @@ module keyboard (
 	      end
 	      // Special case for shift key
               if (k_map && ppi_port_c[3:0] == 4'b0110)
-                p_key_x[0] <= !ps2_shift;  
+                 p_key_x[0] <= !ps2_shift;  
+              if (k_map && ppi_port_c[3:0] == 4'b0110)
+                 p_key_x[1] <= !ps2_ctrl;  
 	      key_row <= {4'b0, ppi_port_c[3:0]};
             end
           end
@@ -155,6 +158,9 @@ module keyboard (
       end else if ((ps2_dat == 8'h12 || ps2_dat == 8'h59) && !ps2_ext) begin // Shift
 	o_f_keys[7] <= !ps2_brk;
 	ps2_shift <= !ps2_brk;
+	ps2_chg <= 0;
+      end else if (ps2_dat == 8'h14) begin // Ctrl
+	ps2_ctrl <= !ps2_brk;
 	ps2_chg <= 0;
       end 
     end
