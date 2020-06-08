@@ -46,9 +46,9 @@ module msx (
   assign ftdi_rxd = wifi_txd;
 
   // VGA (should be assigned to some gp/gn outputs
-  wire   [3:0]  red;
-  wire   [3:0]  green;
-  wire   [3:0]  blue;
+  wire   [7:0]  red;
+  wire   [7:0]  green;
+  wire   [7:0]  blue;
   wire          hSync;
   wire          vSync;
   
@@ -56,9 +56,9 @@ module msx (
     genvar i;
     if (c_vga_out) begin
       for(i = 0; i < 4; i = i+1) begin
-        assign gp[10-i] = red[i];
-        assign gn[3-i] = green[i];
-        assign gn[10-i] = blue[i];
+        assign gp[10-i] = red[4+i];
+        assign gn[3-i] = green[4+i];
+        assign gn[10-i] = blue[4+i];
       end
       assign gp[2] = vSync;
       assign gp[3] = hSync;
@@ -271,6 +271,8 @@ module msx (
     .name_table_addr(name_table_addr),
     .n_int(n_int),
     .video_on(r_vdp[1][6]),
+    .text_color(r_vdp[7][7:4]),
+    .back_color(r_vdp[7][3:0]),
     .diag(vga_diag)
   );
 
@@ -278,9 +280,9 @@ module msx (
   HDMI_out vga2dvid (
     .pixclk(clk_vga),
     .pixclk_x5(clk_hdmi),
-    .red  ({red, {4{red[0]}}}),
-    .green({green, {4{green[0]}}}),
-    .blue ({blue, {4{blue[0]}}}),
+    .red  (red),
+    .green(green),
+    .blue (blue),
     .vde(vga_de),
     .hSync(hSync),
     .vSync(vSync),
@@ -334,6 +336,6 @@ module msx (
 
   assign leds = {led4, led3, led2, led1};
 
-  always @(posedge cpuClock) diag16 <= ps2_key;
+  always @(posedge cpuClock) diag16 <= r_vdp[7];
 
 endmodule

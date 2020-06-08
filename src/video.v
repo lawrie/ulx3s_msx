@@ -2,9 +2,9 @@
 module video (
   input         clk,
   input         reset,
-  output [3:0]  vga_r,
-  output [3:0]  vga_b,
-  output [3:0]  vga_g,
+  output [7:0]  vga_r,
+  output [7:0]  vga_b,
+  output [7:0]  vga_g,
   output        vga_hs,
   output        vga_vs,
   output        vga_de,
@@ -19,6 +19,8 @@ module video (
   input [13:0]  name_table_addr,
   output        n_int,
   input         video_on,
+  input [3:0]   text_color,
+  input [3:0]   back_color,
   output reg [7:0]  diag
 );
 
@@ -38,6 +40,41 @@ module video (
   parameter VT  = VA + VS + VFP + VBP;
   parameter VB = 48;
   parameter VB2 = VB/2;
+
+  localparam transparent  = 24'h000000;
+  localparam black        = 24'h010101;
+  localparam medium_green = 24'h3eb849;
+  localparam light_green  = 24'h74d07d;
+  localparam dark_blue    = 24'h5955e0;
+  localparam light_blue   = 24'h8076f1;
+  localparam dark_red     = 24'hb95e51;
+  localparam cyan         = 24'h65dbef;
+  localparam medium_red   = 24'hdb6559;
+  localparam light_red    = 24'hff897d;
+  localparam dark_yellow  = 24'hccc35e;
+  localparam light_yellow = 24'hded087;
+  localparam dark_green   = 24'h3aa241;
+  localparam magenta      = 24'hb766b5;
+  localparam gray         = 24'hcccccc;
+  localparam white        = 24'hffffff;
+
+  wire [23:0] colors [0:15];
+  assign colors[0]  = transparent;
+  assign colors[1]  = black;
+  assign colors[2]  = medium_green;
+  assign colors[3]  = light_green;
+  assign colors[4]  = dark_blue;
+  assign colors[5]  = light_blue;
+  assign colors[6]  = dark_red;
+  assign colors[7]  = cyan;
+  assign colors[8]  = medium_red;
+  assign colors[9]  = light_red;
+  assign colors[10] = dark_yellow;
+  assign colors[11] = light_yellow;
+  assign colors[12] = dark_green;
+  assign colors[13] = magenta;
+  assign colors[14] = gray;
+  assign colors[15] = white;
 
   reg [9:0] hc = 0;
   reg [9:0] vc = 0;
@@ -143,14 +180,14 @@ module video (
   end
  
   wire pixel = font_line[7 - x_pix];
-  wire pix = ~border & pixel;
+  wire [23:0] color = colors[pixel && !border ? text_color : back_color];
 
-  wire [3:0] red = {4{pix}};
-  wire [3:0] green = {4{pix}};
-  wire [3:0] blue = {4{pix}};
+  wire [7:0] red = color[23:16];
+  wire [7:0] green = color[15:8];
+  wire [7:0] blue = color[7:0];
 
-  assign vga_r = !vga_de ? 4'b0 : red;
-  assign vga_g = !vga_de ? 4'b0 : green;
-  assign vga_b = !vga_de ? 4'b0 : blue;
+  assign vga_r = !vga_de ? 8'b0 : red;
+  assign vga_g = !vga_de ? 8'b0 : green;
+  assign vga_b = !vga_de ? 8'b0 : blue;
 
 endmodule
