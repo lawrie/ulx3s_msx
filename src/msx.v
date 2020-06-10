@@ -213,8 +213,11 @@ module msx (
   reg [7:0]   first_addr_byte;
   reg [7:0]   r_vdp [0:7];
   wire [1:0]  mode = r_vdp[4] ? 0 : 1;
-  wire [13:0] font_addr = r_vdp[4] * 2048;
   wire [13:0] name_table_addr = r_vdp[2] * 1024;
+  wire [13:0] color_table_addr = r_vdp[3] * 64;
+  wire [13:0] font_addr = r_vdp[4] * 2048;
+  wire [13:0] sprite_attr_addr = r_vdp[5] * 128;
+  wire [13:0] sprite_pattern_table_addr = r_vdp[6] * 2048;
   wire [7:0]  vga_diag;
   reg         r_vga_rd;
   reg         cpuClockEnable1; 
@@ -269,6 +272,9 @@ module msx (
     .cpu_clk(cpuClock),
     .font_addr(font_addr),
     .name_table_addr(name_table_addr),
+    .color_table_addr(color_table_addr),
+    .sprite_attr_addr(sprite_attr_addr),
+    .sprite_pattern_table_addr(sprite_pattern_table_addr),
     .n_int(n_int),
     .video_on(r_vdp[1][6]),
     .text_color(r_vdp[7][7:4]),
@@ -336,6 +342,6 @@ module msx (
 
   assign leds = {led4, led3, led2, led1};
 
-  always @(posedge cpuClock) diag16 <= r_vdp[7];
+  always @(posedge cpuClock) diag16 <= r_vdp[5];
 
 endmodule
