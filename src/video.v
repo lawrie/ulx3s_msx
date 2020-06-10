@@ -44,6 +44,7 @@ module video (
   parameter VB = 48;
   parameter VB2 = VB/2;
 
+  // MSX color pallette
   localparam transparent  = 24'h000000;
   localparam black        = 24'h010101;
   localparam medium_green = 24'h3eb849;
@@ -142,10 +143,10 @@ module video (
   reg [7:0] sprite_patterns [0:31];
   reg [3:0] sprite_pixel;
   
-  // All use pattern 0 at the moment
   wire [7:0] sprite_row [0:3];
   wire [2:0] sprite_col [0:3];
 
+  // Calculate pixel positions for 4 active sprites
   generate
     genvar j;
     for(j=0;j<4;j=j+1) begin
@@ -156,6 +157,7 @@ module video (
 
   integer i;
 
+  // Generate VGA signal
   always @(posedge clk) if (video_on) begin
     if (mode == 0) begin
       sprite_pixel <= 0;
@@ -221,12 +223,12 @@ module video (
         x_char <= 63;
       end
 
+      // Look for up to 4 sprites on the current line
       sprite_pixel <= 0;
-
       for (i=0; i<4; i=i+1) begin
         if (sprite_y[i] < 192 && y >= sprite_y[i] && y < sprite_y[i] + 8) begin
           if (x >= sprite_x[i] && x < sprite_x[i] + 8) begin
-	    sprite_pixel[i] <= sprite_row[i][sprite_col[i]];
+	    sprite_pixel[i] <= sprite_row[i][~sprite_col[i]];
 	  end
         end
       end
@@ -237,13 +239,13 @@ module video (
 	                   sprite_pixel[1] ? sprite_color[1] :
 			   sprite_pixel[2] ? sprite_color[2] :
 			   sprite_pixel[3] ? sprite_color[3] :
-	                   font_line[7 - x_pix] ? text_color : back_color;
+	                   font_line[~x_pix] ? text_color : back_color;
   
   wire [23:0] color = colors[border ? border_color : pixel_color];
 
-  wire [7:0] red = color[23:16];
+  wire [7:0] red   = color[23:16];
   wire [7:0] green = color[15:8];
-  wire [7:0] blue = color[7:0];
+  wire [7:0] blue  = color[7:0];
 
   assign vga_r = !vga_de ? 8'b0 : red;
   assign vga_g = !vga_de ? 8'b0 : green;

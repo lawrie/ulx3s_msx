@@ -28,7 +28,7 @@ module msx (
 
   inout  [27:0] gp,gn,
   // Leds
-  output reg [7:0]  leds
+  output [7:0]  leds
 );
 
   parameter c_vga_out = 0;
@@ -94,8 +94,6 @@ module msx (
   wire          n_M1;
   wire          n_kbdCS;
   wire          n_int;
-
-  reg [3:0]     sound = 0;
 
   reg [2:0]     cpuClockCount;
   wire          cpuClock;
@@ -329,8 +327,21 @@ module msx (
   // ===============================================================
   // Audio
   // ===============================================================
-  assign audio_l = sound;
-  assign audio_r = sound;
+  wire [9:0] sound_10;
+  assign audio_l = sound_10[9:6] | {4{ppi_port_c[7]}};
+  assign audio_r = audio_l;
+
+  jt49 audio (
+    .rst_n(n_hard_reset),
+    .clk(cpuClock),
+    .clk_en(cpuClockEnable),
+    .addr(cpuAddress[3:0]),
+    .cs_n(1'b0),
+    .wr_n(n_ioWR || cpuAddress[7:1] != 7'b1010000),
+    .din(cpuDataOut),
+    .sel(1'b1),
+    .sound(sound_10)
+  );
 
   // ===============================================================
   // Leds
@@ -340,9 +351,8 @@ module msx (
   wire led3 = 0;
   wire led4 = !n_hard_reset;
 
-  //assign leds = {led4, led3, led2, led1};
-  assign leds = vga_diag;
+  assign leds = {led4, led3, led2, led1};
 
-  always @(posedge cpuClock) diag16 <= r_vdp[5];
+  always @(posedge cpuClock) if (sound_10 != 0) diag16 <= sound_10;
 
 endmodule
