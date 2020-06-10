@@ -139,20 +139,17 @@ module video (
   reg [7:0] r_char;
   reg [7:0] font_line;
   
-  reg [7:0] sprite0_pattern [0:7];
+  reg [7:0] sprite_patterns [0:31];
   reg [3:0] sprite_pixel;
   
   // All use pattern 0 at the moment
-  wire [7:0] sprite0_row = sprite0_pattern[y - sprite_y[0]];
-  wire [7:0] sprite1_row = sprite0_pattern[y - sprite_y[1]];
-  wire [7:0] sprite2_row = sprite0_pattern[y - sprite_y[2]];
-  wire [7:0] sprite3_row = sprite0_pattern[y - sprite_y[3]];
-
+  wire [7:0] sprite_row [0:3];
   wire [2:0] sprite_col [0:3];
 
   generate
     genvar j;
     for(j=0;j<4;j=j+1) begin
+      assign sprite_row[j] = sprite_patterns[(j << 3) + y - sprite_y[j]];
       assign sprite_col[j] = x - sprite_x[j];
     end
   endgenerate
@@ -213,8 +210,8 @@ module video (
 	      3: sprite_color[(hc[5:1]-1) >> 2] <= vid_out[3:0];
 	    endcase
 	  end
-          if (hc >= HA + 32 && hc < HA + 48) vid_addr <= sprite_pattern_table_addr + hc[3:1];
-	  if (hc >= HA + 34 && hc < HA + 50) sprite0_pattern[hc[4:1] - 1] <= vid_out;
+          if (hc >= HA + 32 && hc < HA + 96) vid_addr <= sprite_pattern_table_addr + hc[5:1];
+	  if (hc >= HA + 34 && hc < HA + 98) sprite_patterns[hc[6:1] - 1] <= vid_out;
 	end
       end
 
@@ -229,12 +226,7 @@ module video (
       for (i=0; i<4; i=i+1) begin
         if (sprite_y[i] < 192 && y >= sprite_y[i] && y < sprite_y[i] + 8) begin
           if (x >= sprite_x[i] && x < sprite_x[i] + 8) begin
-	    case (i)
-              0: sprite_pixel[i] <= sprite0_row[sprite_col[i]];
-              1: sprite_pixel[i] <= sprite1_row[sprite_col[i]];
-              2: sprite_pixel[i] <= sprite2_row[sprite_col[i]];
-              3: sprite_pixel[i] <= sprite3_row[sprite_col[i]];
-	    endcase
+	    sprite_pixel[i] <= sprite_row[i][sprite_col[i]];
 	  end
         end
       end
