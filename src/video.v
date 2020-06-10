@@ -24,7 +24,7 @@ module video (
   input         video_on,
   input [3:0]   text_color,
   input [3:0]   back_color,
-  output reg [7:0]  diag
+  output [7:0]  diag
 );
 
   parameter HA = 640;
@@ -86,6 +86,8 @@ module video (
   reg [3:0] sprite_color [0:3];
   reg [7:0] sprite_pattern [0:3];
 
+  assign diag = sprite_color[1];
+
   reg [9:0] hc = 0;
   reg [9:0] vc = 0;
 
@@ -140,8 +142,20 @@ module video (
   reg [7:0] sprite0_pattern [0:7];
   reg [3:0] sprite_pixel;
   
+  // All use pattern 0 at the moment
   wire [7:0] sprite0_row = sprite0_pattern[y - sprite_y[0]];
-  wire [2:0] sprite0_col = x - sprite_x[0];
+  wire [7:0] sprite1_row = sprite0_pattern[y - sprite_y[1]];
+  wire [7:0] sprite2_row = sprite0_pattern[y - sprite_y[2]];
+  wire [7:0] sprite3_row = sprite0_pattern[y - sprite_y[3]];
+
+  wire [2:0] sprite_col [0:3];
+
+  generate
+    genvar j;
+    for(j=0;j<4;j=j+1) begin
+      assign sprite_col[j] = x - sprite_x[j];
+    end
+  endgenerate
 
   integer i;
 
@@ -189,18 +203,18 @@ module video (
             // Store the font line ready for next character
             font_line <= vid_out;
 	  end
-        end else begin // Read sprite 0 patterns and attributes
-          if (hc < HA + 16) vid_addr <= sprite_pattern_table_addr + hc[3:1];
-	  if (hc >= HA + 2 && hc < HA + 18) sprite0_pattern[hc[4:1] - 1] <= vid_out;
-	  if (hc >= HA + 16 && hc < HA + 24) vid_addr <= sprite_attr_addr + hc[5:1] - 8;
-	  if (hc >= HA + 18 && hc < HA + 26) begin
-	    case (hc[5:1] - 9)
-              0: sprite_y[0] <= vid_out;
-	      1: sprite_x[0] <= vid_out;
-	      2: sprite_pattern[0] <= vid_out;
-	      3: sprite_color[0] <= vid_out[3:0];
+        end else begin // Read sprite attributes and patterns
+	  if (hc < HA + 32) vid_addr <= sprite_attr_addr + hc[4:1];
+	  if (hc >= HA + 2 && hc < HA + 34) begin
+	    case ((hc[3:1] - 1) & 2'b11)
+              0: sprite_y[(hc[5:1]-1) >> 2] <= vid_out;
+	      1: sprite_x[(hc[5:1]-1) >> 2] <= vid_out;
+	      2: sprite_pattern[(hc[5:1]-1) >> 2] <= vid_out;
+	      3: sprite_color[(hc[5:1]-1) >> 2] <= vid_out[3:0];
 	    endcase
 	  end
+          if (hc >= HA + 32 && hc < HA + 48) vid_addr <= sprite_pattern_table_addr + hc[3:1];
+	  if (hc >= HA + 34 && hc < HA + 50) sprite0_pattern[hc[4:1] - 1] <= vid_out;
 	end
       end
 
@@ -215,14 +229,23 @@ module video (
       for (i=0; i<4; i=i+1) begin
         if (sprite_y[i] < 192 && y >= sprite_y[i] && y < sprite_y[i] + 8) begin
           if (x >= sprite_x[i] && x < sprite_x[i] + 8) begin
-            sprite_pixel[i] <= sprite0_row[sprite0_col];
+	    case (i)
+              0: sprite_pixel[i] <= sprite0_row[sprite_col[i]];
+              1: sprite_pixel[i] <= sprite1_row[sprite_col[i]];
+              2: sprite_pixel[i] <= sprite2_row[sprite_col[i]];
+              3: sprite_pixel[i] <= sprite3_row[sprite_col[i]];
+	    endcase
 	  end
         end
       end
     end
   end
  
-  wire [3:0] pixel_color = sprite_pixel[0] ? sprite_color[0] : font_line[7 - x_pix] ? text_color : back_color;
+  wire [3:0] pixel_color = sprite_pixel[0] ? sprite_color[0] : 
+	                   sprite_pixel[1] ? sprite_color[1] :
+			   sprite_pixel[2] ? sprite_color[2] :
+			   sprite_pixel[3] ? sprite_color[3] :
+	                   font_line[7 - x_pix] ? text_color : back_color;
   
   wire [23:0] color = colors[border ? border_color : pixel_color];
 

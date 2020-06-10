@@ -340,7 +340,8 @@ module msx (
   wire led3 = 0;
   wire led4 = !n_hard_reset;
 
-  assign leds = {led4, led3, led2, led1};
+  //assign leds = {led4, led3, led2, led1};
+  assign leds = vga_diag;
 
   always @(posedge cpuClock) diag16 <= r_vdp[5];
 
