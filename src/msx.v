@@ -95,9 +95,11 @@ module msx (
   wire          n_kbdCS;
   wire          n_int;
 
-  reg [2:0]     cpuClockCount;
+  reg [3:0]     cpuClockCount;
   wire          cpuClock;
   wire          cpuClockEnable;
+  reg           cpuClockEnable1; 
+  wire          cpuClockEdge = cpuClockEnable && !cpuClockEnable1;
   wire [7:0]    ramOut;
 
   // ===============================================================
@@ -218,11 +220,11 @@ module msx (
   wire [13:0] sprite_pattern_table_addr = r_vdp[6] * 2048;
   wire [7:0]  vga_diag;
   reg         r_vga_rd;
-  reg         cpuClockEnable1; 
-  wire        cpuClockEdge = cpuClockEnable && !cpuClockEnable1;
+  reg [3:0]   r_psg;
 
   always @(posedge cpuClock) begin
     if (cpuClockEdge) begin
+      if (cpuAddress[7:0] == 8'ha0 && n_ioWR == 1'b0) r_psg <= cpuDataOut[3:0];
       // VDP interface
       if (vga_wr) vga_addr <= vga_addr + 1;
       // Increment address on CPU cycle after IO read
@@ -328,16 +330,16 @@ module msx (
   // Audio
   // ===============================================================
   wire [9:0] sound_10;
-  assign audio_l = sound_10[9:6] | {4{ppi_port_c[7]}};
+  assign audio_l = sound_10[7:4] | {2{ppi_port_c[7]}};
   assign audio_r = audio_l;
 
-  jt49 audio (
+  jt49 #(.CLKDIV(6)) audio (
     .rst_n(n_hard_reset),
     .clk(cpuClock),
     .clk_en(cpuClockEnable),
-    .addr(cpuAddress[3:0]),
+    .addr(r_psg),
     .cs_n(1'b0),
-    .wr_n(n_ioWR || cpuAddress[7:1] != 7'b1010000),
+    .wr_n(n_ioWR || cpuAddress[7:0] != 8'ha1),
     .din(cpuDataOut),
     .sel(1'b1),
     .sound(sound_10)
@@ -353,6 +355,6 @@ module msx (
 
   assign leds = {led4, led3, led2, led1};
 
-  always @(posedge cpuClock) if (sound_10 != 0) diag16 <= sound_10;
+  always @(posedge cpuClock) diag16 <= sound_10;
 
 endmodule
