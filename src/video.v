@@ -24,6 +24,12 @@ module video (
   input         video_on,
   input [3:0]   text_color,
   input [3:0]   back_color,
+  input         sprite_large,
+  input         sprite_enlarged,
+  input         vert_retrace_int,
+  output        sprite_collision,
+  output        too_many_sprites,
+  output [4:0]  sprite5,
   output [7:0]  diag
 );
 
@@ -146,6 +152,10 @@ module video (
   wire [7:0] sprite_row [0:3];
   wire [2:0] sprite_col [0:3];
 
+  assign sprite_collision = 0;
+  assign too_many_sprites = 0;
+  assign sprite5 = 0;
+
   // Calculate pixel positions for 4 active sprites
   generate
     genvar j;
@@ -184,7 +194,7 @@ module video (
         x_pix <= 0;
         x_char <= 63;
       end
-    end else if (mode == 1) begin
+    end else begin
       if (hc[0] == 1) begin
         x_pix <= x_pix + 1;
         if (x_pix == 7) begin
@@ -212,7 +222,8 @@ module video (
 	      3: sprite_color[(hc[5:1]-1) >> 2] <= vid_out[3:0];
 	    endcase
 	  end
-          if (hc >= HA + 32 && hc < HA + 96) vid_addr <= sprite_pattern_table_addr + hc[5:1];
+          if (hc >= HA + 32 && hc < HA + 96)
+            vid_addr <= sprite_pattern_table_addr + (sprite_pattern[hc[5:4]] << 3) + hc[3:1];
 	  if (hc >= HA + 34 && hc < HA + 98) sprite_patterns[hc[6:1] - 1] <= vid_out;
 	end
       end

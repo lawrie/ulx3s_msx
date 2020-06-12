@@ -212,7 +212,7 @@ module msx (
   reg         is_second_addr_byte = 0;
   reg [7:0]   first_addr_byte;
   reg [7:0]   r_vdp [0:7];
-  wire [1:0]  mode = r_vdp[4] ? 0 : 1;
+  wire [1:0]  mode = r_vdp[1][3] ? 3 : r_vdp[0][1] ? 2 : r_vdp[1][4] ? 0 : 1;
   wire [13:0] name_table_addr = r_vdp[2] * 1024;
   wire [13:0] color_table_addr = r_vdp[3] * 64;
   wire [13:0] font_addr = r_vdp[4] * 2048;
@@ -221,6 +221,9 @@ module msx (
   wire [7:0]  vga_diag;
   reg         r_vga_rd;
   reg [3:0]   r_psg;
+  wire [4:0]  sprite5;
+  wire        sprite_collision;
+  wire        too_many_sprites;
 
   always @(posedge cpuClock) begin
     if (cpuClockEdge) begin
@@ -279,6 +282,12 @@ module msx (
     .video_on(r_vdp[1][6]),
     .text_color(r_vdp[7][7:4]),
     .back_color(r_vdp[7][3:0]),
+    .sprite_large(r_vdp[1][1]),
+    .sprite_enlarged(r_vdp[1][0]),
+    .vert_retrace_int(r_vdp[1][5]),
+    .sprite_collision(sprite_collision),
+    .too_many_sprites(too_many_sprites),
+    .sprite5(sprite5),
     .diag(vga_diag)
   );
 
@@ -313,6 +322,7 @@ module msx (
                       cpuAddress[7:0] == 8'ha9 && n_ioRD == 1'b0 ? ppi_port_b :
                       cpuAddress[7:0] == 8'haa && n_ioRD == 1'b0 ? ppi_port_c :
 		      cpuAddress[7:0] == 8'h98 && n_ioRD == 1'b0 ? vga_dout :
+		      cpuAddress[7:0] == 8'h99 && n_ioRD == 1'b0 ? {n_int, too_many_sprites, sprite_collision, (too_many_sprites ? sprite5 : 5'b11111)} :
                       ramOut;
   
   // ===============================================================
@@ -355,6 +365,6 @@ module msx (
 
   assign leds = {led4, led3, led2, led1};
 
-  always @(posedge cpuClock) diag16 <= sound_10;
+  always @(posedge cpuClock) diag16 <= {r_vdp[1], r_vdp[0]};
 
 endmodule
