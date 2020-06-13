@@ -202,15 +202,28 @@ module video (
 	  x_char <= x_char + 1;
         end
 	if (hc < HA) begin 
-          if (x_pix == 3) begin
-            // Set address for next character
-            vid_addr <= name_table_addr + (y[7:3] * 32 + x_char + 1);
-          end else if (x_pix == 4) begin
-            // Set address for font line
-            vid_addr <= font_addr + {vid_out, y[2:0]};
-          end else if (x_pix == 5) begin
-            // Store the font line ready for next character
-            font_line <= vid_out;
+          if (mode == 1) begin
+            if (x_pix == 5) begin
+              // Set address for next character
+              vid_addr <= name_table_addr + (y[7:3] * 32 + x_char + 1);
+            end else if (x_pix == 6) begin
+              // Set address for font line
+              vid_addr <= font_addr + {vid_out, y[2:0]};
+            end else if (x_pix == 7) begin
+              // Store the font line ready for next character
+              font_line <= vid_out;
+	    end
+          end else if (mode == 2) begin
+            if (x_pix == 5) begin
+              // Set address for next character
+              vid_addr <= name_table_addr + (y[7:3] * 32 + x_char + 1);
+            end else if (x_pix == 6) begin
+              // Set address for font line
+              vid_addr <= (y[7:6] * 14'h800) + {vid_out, y[2:0]};
+            end else if (x_pix == 7) begin
+              // Store the font line ready for next character
+              font_line <= vid_out;
+	    end
 	  end
         end else begin // Read sprite attributes and patterns
 	  if (hc < HA + 32) vid_addr <= sprite_attr_addr + hc[4:1];
