@@ -230,8 +230,8 @@ module video (
               // Set address for next character
               vid_addr <= name_table_addr + (y[7:3] * 32 + x_char + 1);
             end else if (x_pix == 6) begin
-              // Set address for font line
-              vid_addr <= font_addr + {vid_out, y[2]};
+              // Set address for color block
+              vid_addr <= font_addr + {vid_out, y[4:2]};
             end else if (x_pix == 7) begin
               // Store the font line ready for next character
               font_line <= {vid_out[7:4] == 15 ? 4'b1111 : 4'b0, vid_out[3:0] == 15 ? 4'b1111 : 4'b0};
