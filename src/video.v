@@ -86,7 +86,8 @@ module video (
   assign colors[14] = gray;
   assign colors[15] = white;
 
-  wire [3:0] border_color = back_color;
+  reg [3:0] text_col = 15;
+  reg [3:0] back_col = 4;
 
   reg [7:0] sprite_y [0:3];
   reg [7:0] sprite_x [0:3];
@@ -224,6 +225,17 @@ module video (
               // Store the font line ready for next character
               font_line <= vid_out;
 	    end
+          end else if (mode == 3) begin
+            if (x_pix == 5) begin
+              // Set address for next character
+              vid_addr <= name_table_addr + (y[7:3] * 32 + x_char + 1);
+            end else if (x_pix == 6) begin
+              // Set address for font line
+              vid_addr <= font_addr + {vid_out, y[2]};
+            end else if (x_pix == 7) begin
+              // Store the font line ready for next character
+              font_line <= {vid_out[7:4] == 15 ? 4'b1111 : 4'b0, vid_out[3:0] == 15 ? 4'b1111 : 4'b0};
+	    end
 	  end
         end else begin // Read sprite attributes and patterns
 	  if (hc < HA + 32) vid_addr <= sprite_attr_addr + hc[4:1];
@@ -263,9 +275,10 @@ module video (
 	                   sprite_pixel[1] ? sprite_color[1] :
 			   sprite_pixel[2] ? sprite_color[2] :
 			   sprite_pixel[3] ? sprite_color[3] :
-	                   font_line[~x_pix] ? text_color : back_color;
+	                   mode == 0 ? (font_line[~x_pix] ? text_color : back_color) :
+			   font_line[~x_pix] ? text_col : back_col;
   
-  wire [23:0] color = colors[border ? border_color : pixel_color];
+  wire [23:0] color = colors[border ? back_color : pixel_color];
 
   wire [7:0] red   = color[23:16];
   wire [7:0] green = color[15:8];
