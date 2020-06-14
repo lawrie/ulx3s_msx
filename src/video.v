@@ -88,6 +88,7 @@ module video (
 
   reg [3:0] text_col = 15;
   reg [3:0] back_col = 4;
+  reg [7:0] screen0_color;
 
   reg [7:0] sprite_y [0:3];
   reg [7:0] sprite_x [0:3];
@@ -170,6 +171,7 @@ module video (
 
   // Generate VGA signal
   always @(posedge clk) if (video_on) begin
+
     if (mode == 0) begin
       sprite_pixel <= 0;
       if (hc[0] == 1) begin
@@ -196,6 +198,9 @@ module video (
         x_char <= 63;
       end
     end else begin
+      // Get the text color (assumes all 32 values are the same)
+      if (hc == HA) vid_addr <= color_table_addr;
+      if (hc == HA + 2) screen0_color <= vid_out;
       if (hc[0] == 1) begin
         x_pix <= x_pix + 1;
         if (x_pix == 7) begin
@@ -233,8 +238,8 @@ module video (
               // Set address for color block
               vid_addr <= font_addr + {vid_out, y[4:2]};
             end else if (x_pix == 7) begin
-              // Store the font line ready for next character
-              font_line <= {vid_out[7:4] == 15 ? 4'b1111 : 4'b0, vid_out[3:0] == 15 ? 4'b1111 : 4'b0};
+              // Set the colors
+              font_line <= vid_out;
 	    end
 	  end
         end else begin // Read sprite attributes and patterns
@@ -276,7 +281,8 @@ module video (
 			   sprite_pixel[2] ? sprite_color[2] :
 			   sprite_pixel[3] ? sprite_color[3] :
 	                   mode == 0 ? (font_line[~x_pix] ? text_color : back_color) :
-			   font_line[~x_pix] ? text_col : back_col;
+			   mode == 3 ? (x_pix < 4 ? font_line[7:4] : font_line[3:0]) :
+			   font_line[~x_pix] ? screen0_color[7:4] : screen0_color[3:0];
   
   wire [23:0] color = colors[border ? back_color : pixel_color];
 
