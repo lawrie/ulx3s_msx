@@ -88,7 +88,8 @@ module video (
 
   reg [3:0] text_col = 15;
   reg [3:0] back_col = 4;
-  reg [7:0] screen0_color;
+  reg [7:0] screen_color;
+  reg [7:0] screen_color_next;
 
   reg [7:0] sprite_y [0:3];
   reg [7:0] sprite_x [0:3];
@@ -198,9 +199,25 @@ module video (
         x_char <= 63;
       end
     end else begin
-      // Get the text color (assumes all 32 values are the same)
-      if (hc == HA) vid_addr <= color_table_addr;
-      if (hc == HA + 2) screen0_color <= vid_out;
+      if (mode == 1) begin
+        // Get the text color (assumes all 32 values are the same)
+        if (hc == HA) vid_addr <= color_table_addr;
+        if (hc == HA + 2) screen_color <= vid_out;
+      end else if (mode == 2) begin
+        if (hc[0] == 0 && hc < HA) begin
+          // Get the colors for mode 2
+          if (x_pix == 5) begin
+            // Set address for next character
+            vid_addr <= name_table_addr + (y[7:3] * 32 + x_char + 1);
+          end else if (x_pix == 6) begin
+            // Set address for next color block
+            vid_addr <= color_table_addr + (y[7:6] * 14'h800) + {vid_out, y[2:0]};
+          end else if (x_pix == 7) begin
+            // Store the color block ready for next character
+            screen_color_next <= vid_out;
+	  end
+	end
+      end
       if (hc[0] == 1) begin
         x_pix <= x_pix + 1;
         if (x_pix == 7) begin
@@ -229,6 +246,7 @@ module video (
             end else if (x_pix == 7) begin
               // Store the font line ready for next character
               font_line <= vid_out;
+	      screen_color <= screen_color_next;
 	    end
           end else if (mode == 3) begin
             if (x_pix == 5) begin
@@ -279,10 +297,10 @@ module video (
   wire [3:0] pixel_color = sprite_pixel[0] ? sprite_color[0] : 
 	                   sprite_pixel[1] ? sprite_color[1] :
 			   sprite_pixel[2] ? sprite_color[2] :
-			   sprite_pixel[3] ? sprite_color[3] :
+			   sprite_pixel[3] ? sprite_color[3] : 
 	                   mode == 0 ? (font_line[~x_pix] ? text_color : back_color) :
 			   mode == 3 ? (x_pix < 4 ? font_line[7:4] : font_line[3:0]) :
-			   font_line[~x_pix] ? screen0_color[7:4] : screen0_color[3:0];
+			   font_line[~x_pix] ? screen_color[7:4] : screen_color[3:0];
   
   wire [23:0] color = colors[border ? back_color : pixel_color];
 
