@@ -29,6 +29,7 @@ module video (
   input         vert_retrace_int,
   output        sprite_collision,
   output        too_many_sprites,
+  output        interrupt_flag,
   output [4:0]  sprite5,
   output [7:0]  diag
 );
@@ -155,7 +156,10 @@ module video (
   wire [7:0] sprite_row [0:3];
   wire [2:0] sprite_col [0:3];
 
-  assign sprite_collision = 0;
+  reg [2:0] sprite_count = 0;
+
+  assign sprite_collision  = (sprite_pixel == 3);
+  assign interrupt_flag = (hc == VA);
   assign too_many_sprites = 0;
   assign sprite5 = 0;
 
@@ -172,9 +176,9 @@ module video (
 
   // Generate VGA signal
   always @(posedge clk) if (video_on) begin
-
     if (mode == 0) begin
       sprite_pixel <= 0;
+      sprite_count <= 0;
       if (hc[0] == 1) begin
         x_pix <= x_pix + 1;
         if (x_pix == 5) begin
@@ -284,10 +288,14 @@ module video (
 
       // Look for up to 4 sprites on the current line
       sprite_pixel <= 0;
+      sprite_count <= 0;
       for (i=0; i<4; i=i+1) begin
         if (sprite_y[i] < 192 && y >= sprite_y[i] && y < sprite_y[i] + (8 << sprite_enlarged)) begin
           if (x >= sprite_x[i] && x < sprite_x[i] + (8 << sprite_enlarged)) begin
-	    sprite_pixel[i] <= sprite_row[i][~sprite_col[i]];
+	    if (sprite_row[i][~sprite_col[i]]) begin
+              sprite_pixel[i] <= 1;
+	      if (!sprite_pixel[i]) sprite_count <= sprite_count + 1;
+            end
 	  end
         end
       end

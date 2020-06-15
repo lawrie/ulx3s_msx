@@ -224,6 +224,7 @@ module msx (
   wire [4:0]  sprite5;
   wire        sprite_collision;
   wire        too_many_sprites;
+  wire        interrupt_flag;
 
   always @(posedge cpuClock) begin
     if (cpuClockEdge) begin
@@ -288,6 +289,7 @@ module msx (
     .sprite_collision(sprite_collision),
     .too_many_sprites(too_many_sprites),
     .sprite5(sprite5),
+    .interrupt_flag(interrupt_flag),
     .diag(vga_diag)
   );
 
@@ -318,12 +320,33 @@ module msx (
   // Memory decoding
   // ===============================================================
 
+  reg  r_interrupt_flag, r_sprite_collision;
+  reg  r_status_read;
+  wire [7:0] status = {r_interrupt_flag, too_many_sprites, r_sprite_collision, (too_many_sprites ? sprite5 : 5'b11111)};
+
   assign cpuDataIn =  cpuAddress[7:0] == 8'ha8 && n_ioRD == 1'b0 ? ppi_port_a :
                       cpuAddress[7:0] == 8'ha9 && n_ioRD == 1'b0 ? ppi_port_b :
                       cpuAddress[7:0] == 8'haa && n_ioRD == 1'b0 ? ppi_port_c :
 		      cpuAddress[7:0] == 8'h98 && n_ioRD == 1'b0 ? vga_dout :
-		      cpuAddress[7:0] == 8'h99 && n_ioRD == 1'b0 ? {n_int, too_many_sprites, sprite_collision, (too_many_sprites ? sprite5 : 5'b11111)} :
+		      cpuAddress[7:0] == 8'h99 && n_ioRD == 1'b0 ? status :
                       ramOut;
+
+  always @(posedge cpuClock) begin
+    if (!n_hard_reset) begin
+      r_interrupt_flag <= 0;
+      r_sprite_collision <= 0;
+    end else begin
+      if (interrupt_flag) r_interrupt_flag <= 1;
+      if (sprite_collision) r_sprite_collision <= 1;
+      if (cpuClockEdge) begin
+        r_status_read <= cpuAddress[7:0] == 8'h99 && n_ioRD == 1'b0;
+        if (r_status_read && !(cpuAddress[7:0] == 8'h99 && n_ioRD == 1'b0)) begin
+          //r_interrupt_flag <= 0;
+          r_sprite_collision <= 0;
+	end
+      end
+    end
+  end
   
   // ===============================================================
   // CPU clock enable
@@ -365,6 +388,6 @@ module msx (
 
   assign leds = {led4, led3, led2, led1};
 
-  always @(posedge cpuClock) diag16 <= font_addr;
+  always @(posedge cpuClock) diag16 <= status;
 
 endmodule
