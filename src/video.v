@@ -163,8 +163,8 @@ module video (
   generate
     genvar j;
     for(j=0;j<4;j=j+1) begin
-      assign sprite_row[j] = sprite_patterns[(j << 3) + y - sprite_y[j]];
-      assign sprite_col[j] = x - sprite_x[j];
+      assign sprite_row[j] = sprite_patterns[(j << 3) + ((y - sprite_y[j]) >> sprite_enlarged)];
+      assign sprite_col[j] = ((x - sprite_x[j]) >> sprite_enlarged);
     end
   endgenerate
 
@@ -242,7 +242,7 @@ module video (
               vid_addr <= name_table_addr + (y[7:3] * 32 + x_char + 1);
             end else if (x_pix == 6) begin
               // Set address for font line
-              vid_addr <= (y[7:6] * 14'h800) + {vid_out, y[2:0]};
+              vid_addr <= font_addr + (y[7:6] * 14'h800) + {vid_out, y[2:0]};
             end else if (x_pix == 7) begin
               // Store the font line ready for next character
               font_line <= vid_out;
@@ -285,8 +285,8 @@ module video (
       // Look for up to 4 sprites on the current line
       sprite_pixel <= 0;
       for (i=0; i<4; i=i+1) begin
-        if (sprite_y[i] < 192 && y >= sprite_y[i] && y < sprite_y[i] + 8) begin
-          if (x >= sprite_x[i] && x < sprite_x[i] + 8) begin
+        if (sprite_y[i] < 192 && y >= sprite_y[i] && y < sprite_y[i] + (8 << sprite_enlarged)) begin
+          if (x >= sprite_x[i] && x < sprite_x[i] + (8 << sprite_enlarged)) begin
 	    sprite_pixel[i] <= sprite_row[i][~sprite_col[i]];
 	  end
         end

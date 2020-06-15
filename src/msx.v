@@ -215,7 +215,7 @@ module msx (
   wire [1:0]  mode = r_vdp[1][3] ? 3 : r_vdp[0][1] ? 2 : r_vdp[1][4] ? 0 : 1;
   wire [13:0] name_table_addr = r_vdp[2] * 1024;
   wire [13:0] color_table_addr = r_vdp[3][7] * 16'h2000;
-  wire [13:0] font_addr = r_vdp[4] * 2048;
+  wire [13:0] font_addr = mode == 2 ? r_vdp[4][2] * 8192 : r_vdp[4] * 2048;
   wire [13:0] sprite_attr_addr = r_vdp[5] * 128;
   wire [13:0] sprite_pattern_table_addr = r_vdp[6] * 2048;
   wire [7:0]  vga_diag;
