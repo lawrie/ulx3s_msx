@@ -20,13 +20,13 @@ module video (
   input [13:0]  sprite_attr_addr,
   input [13:0]  sprite_pattern_table_addr,
   input [13:0]  color_table_addr,
-  output        n_int,
   input         video_on,
   input [3:0]   text_color,
   input [3:0]   back_color,
   input         sprite_large,
   input         sprite_enlarged,
   input         vert_retrace_int,
+  output        n_int,
   output        sprite_collision,
   output        too_many_sprites,
   output        interrupt_flag,
@@ -34,6 +34,7 @@ module video (
   output [7:0]  diag
 );
 
+  // VGA output parameters for 60hz 640x480
   parameter HA = 640;
   parameter HS  = 96;
   parameter HFP = 16;
@@ -41,7 +42,7 @@ module video (
   parameter HT  = HA + HS + HFP + HBP;
   parameter HB = 80;
   parameter HB2 = HB/2;
-  parameter HBadj = 12;
+  parameter HBadj = 12; // Border adjustment
 
   parameter VA = 480;
   parameter VS  = 2;
@@ -87,8 +88,7 @@ module video (
   assign colors[14] = gray;
   assign colors[15] = white;
 
-  reg [3:0] text_col = 15;
-  reg [3:0] back_col = 4;
+  // Data for graphics and sprites
   reg [7:0] screen_color;
   reg [7:0] screen_color_next;
 
@@ -97,16 +97,34 @@ module video (
   reg [3:0] sprite_color [0:3];
   reg [7:0] sprite_pattern [0:3];
 
-  assign diag = sprite_color[1];
-
   reg [9:0] hc = 0;
   reg [9:0] vc = 0;
 
   reg INT = 0;
   reg[5:0] intCnt = 1;
 
-  assign n_int = !INT;
+  reg [7:0] r_char;
+  reg [7:0] font_line;
+  
+  reg [7:0] sprite_patterns [0:31];
+  reg [3:0] sprite_pixel;
+  
+  // Sprite collision count
+  wire [2:0] sprite_count = sprite_pixel[3] + sprite_pixel[2] + 
+	                    sprite_pixel[1] + sprite_pixel[0];
 
+  // Sprite collision status data
+  assign sprite_collision  = (sprite_count > 1);
+  assign too_many_sprites = 0;
+  assign sprite5 = 0;
+
+  // Set CPU interrupt flag
+  assign n_int = !INT;
+  // Status interrupt flag
+  assign interrupt_flag = (hc == VA);
+
+  // Set horizontal and vertical counters, generate sync signals and
+  // vertical sync interrupt interrupt
   always @(posedge clk) begin
     if (hc == HT - 1) begin
       hc <= 0;
@@ -122,16 +140,22 @@ module video (
   assign vga_vs = !(vc >= VA + VFP && vc < VA + VFP + VS);
   assign vga_de = !(hc > HA || vc > VA);
 
+  // Set x and y to screen pixel coordinates. x not valid in text mode
   wire [7:0] x = hc[9:1] - HB2;
   wire [7:0] y = vc[9:1] - VB2;
 
+  // Set the x position as a character and pixel offset. Valid in all modes.
   reg [5:0] x_char;
   reg [2:0] x_pix;
 
+  wire [3:0] char_width = (mode == 0 ? 6 : 8);
+
+  // Calculate the border
   wire hBorder = (hc < (HB + HBadj) || hc >= HA - HB);
   wire vBorder = (vc < VB || vc >= VA - VB);
   wire border = hBorder || vBorder;
 
+  // VRAM
   reg [13:0] vid_addr;
   wire [7:0] vid_out; 
 
@@ -147,24 +171,10 @@ module video (
     .dout_b(vid_out)
   );
 
-  reg [7:0] r_char;
-  reg [7:0] font_line;
-  
-  reg [7:0] sprite_patterns [0:31];
-  reg [3:0] sprite_pixel;
-  
+  // Calculate pixel positions for 4 active sprites
   wire [7:0] sprite_row [0:3];
   wire [2:0] sprite_col [0:3];
 
-  wire [2:0] sprite_count = sprite_pixel[3] + sprite_pixel[2] + 
-	                    sprite_pixel[1] + sprite_pixel[0];
-
-  assign sprite_collision  = (sprite_count > 1);
-  assign interrupt_flag = (hc == VA);
-  assign too_many_sprites = 0;
-  assign sprite5 = 0;
-
-  // Calculate pixel positions for 4 active sprites
   generate
     genvar j;
     for(j=0;j<4;j=j+1) begin
@@ -173,18 +183,30 @@ module video (
     end
   endgenerate
 
+  // Calculate x_char and x_pix
+  always @(posedge clk) begin
+    if (hc[0] == 1) begin
+      x_pix <= x_pix + 1;
+      if (x_pix == (char_width - 1)) begin
+        x_pix <= 0;
+        x_char <= x_char + 1;
+      end
+    end
+
+    // Get ready for start of line
+    if (hc == HB - (char_width << 1) - 1) begin
+      x_pix <= 0;
+      x_char <= 63;
+    end
+  end
+
   integer i;
 
-  // Generate VGA signal
+  // Fetch VRAM data and create pixel output
   always @(posedge clk) if (video_on) begin
     if (mode == 0) begin
       sprite_pixel <= 0;
       if (hc[0] == 1) begin
-        x_pix <= x_pix + 1;
-        if (x_pix == 5) begin
-          x_pix <= 0;
-	  x_char <= x_char + 1;
-        end
         if (x_pix == 3) begin
           // Set address for next character
           vid_addr <= name_table_addr + (y[7:3] * 40 + x_char + 1);
@@ -196,18 +218,16 @@ module video (
           font_line <= vid_out;
         end
       end
-
-      // Get ready for start of line
-      if (hc == HB - 13) begin
-        x_pix <= 0;
-        x_char <= 63;
-      end
     end else begin
+      // In screen mode 1, 32 entries in color table specify the colors for
+      // groups of 8 characters.
       if (mode == 1) begin
         // Get the text color (assumes all 32 values are the same)
         if (hc == HA) vid_addr <= color_table_addr;
         if (hc == HA + 2) screen_color <= vid_out;
       end else if (mode == 2) begin
+	// In screen mode 2, there are two colors for each line of 8 pixels
+	// The screen is 256x192 pixels
         if (hc[0] == 0 && hc < HA) begin
           // Get the colors for mode 2
           if (x_pix == 5) begin
@@ -222,13 +242,10 @@ module video (
 	  end
 	end
       end
+      // Fetch the pattern data, on odd cycles
       if (hc[0] == 1) begin
-        x_pix <= x_pix + 1;
-        if (x_pix == 7) begin
-          x_pix <= 0;
-	  x_char <= x_char + 1;
-        end
 	if (hc < HA) begin 
+          // Fetch the font for screen mode 1
           if (mode == 1) begin
             if (x_pix == 5) begin
               // Set address for next character
@@ -240,6 +257,7 @@ module video (
               // Store the font line ready for next character
               font_line <= vid_out;
 	    end
+	  // In screen mode 2, there are 3 blocks of patterns
           end else if (mode == 2) begin
             if (x_pix == 5) begin
               // Set address for next character
@@ -280,12 +298,6 @@ module video (
 	end
       end
 
-      // Get ready for start of line
-      if (hc == HB - 17) begin
-        x_pix <= 0;
-        x_char <= 63;
-      end
-
       // Look for up to 4 sprites on the current line
       sprite_pixel <= 0;
       for (i=0; i<4; i=i+1) begin
@@ -299,7 +311,8 @@ module video (
       end
     end
   end
- 
+
+  // Set the pixel from highest priority plane 
   wire [3:0] pixel_color = sprite_pixel[0] ? sprite_color[0] : 
 	                   sprite_pixel[1] ? sprite_color[1] :
 			   sprite_pixel[2] ? sprite_color[2] :
@@ -308,14 +321,14 @@ module video (
 			   mode == 3 ? (x_pix < 4 ? font_line[7:4] : font_line[3:0]) :
 			   font_line[~x_pix] ? screen_color[7:4] : screen_color[3:0];
   
+  // Set the 24-bit color value, taking border into account
   wire [23:0] color = colors[border ? back_color : pixel_color];
 
-  wire [7:0] red   = color[23:16];
-  wire [7:0] green = color[15:8];
-  wire [7:0] blue  = color[7:0];
+  // Set the 8-bit VGA output signals
+  assign vga_r = !vga_de ? 8'b0 : color[23:16];
+  assign vga_g = !vga_de ? 8'b0 : color[15:8];
+  assign vga_b = !vga_de ? 8'b0 : color[7:0];
 
-  assign vga_r = !vga_de ? 8'b0 : red;
-  assign vga_g = !vga_de ? 8'b0 : green;
-  assign vga_b = !vga_de ? 8'b0 : blue;
+  assign diag = 0;
 
 endmodule
