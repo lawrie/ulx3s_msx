@@ -96,6 +96,9 @@ module video (
   reg [7:0] sprite_x [0:3];
   reg [3:0] sprite_color [0:3];
   reg [7:0] sprite_pattern [0:3];
+  reg [5:0] sprite_num [0:3];
+  reg [7:0] next_sprite_line [0:3];
+  reg [7:0] sprite_line [0:3];
 
   reg [9:0] hc = 0;
   reg [9:0] vc = 0;
@@ -106,7 +109,6 @@ module video (
   reg [7:0] r_char;
   reg [7:0] font_line;
   
-  reg [7:0] sprite_patterns [0:31];
   reg [3:0] sprite_pixel;
   
   // Sprite collision count
@@ -173,13 +175,11 @@ module video (
   );
 
   // Calculate pixel positions for 4 active sprites
-  wire [7:0] sprite_row [0:3];
   wire [2:0] sprite_col [0:3];
 
   generate
     genvar j;
     for(j=0;j<4;j=j+1) begin
-      assign sprite_row[j] = sprite_patterns[(j << 3) + ((y - sprite_y[j]) >> sprite_enlarged)];
       assign sprite_col[j] = ((x - sprite_x[j]) >> sprite_enlarged);
     end
   endgenerate
@@ -220,23 +220,20 @@ module video (
         end
       end
     end else begin
-      // In screen mode 1, 32 entries in color table specify the colors for
-      // groups of 8 characters.
-      if (mode == 1) begin
-        // Get the text color (assumes all 32 values are the same)
-        if (hc == HA) vid_addr <= color_table_addr;
-        if (hc == HA + 2) screen_color <= vid_out;
-      end else if (mode == 2) begin
-	// In screen mode 2, there are two colors for each line of 8 pixels
-	// The screen is 256x192 pixels
+      if (mode == 1 || mode == 2) begin
+        // In screen mode 1, 32 entries in color table specify the colors for
+        // groups of 8 characters.
+	// In screen mode 2, there are two colors for each line of 8 pixels,
+	// the screen is 256x192 pixels
         if (hc[0] == 0 && hc < HA) begin
-          // Get the colors for mode 2
+          // Get the colors
           if (x_pix == 5) begin
             // Set address for next character
             vid_addr <= name_table_addr + {y[7:3], next_char};
           end else if (x_pix == 6) begin
             // Set address for next color block
-            vid_addr <= color_table_addr + {y[7:6], 11'b0} + {vid_out, y[2:0]};
+            if (mode == 2) vid_addr <= color_table_addr + {y[7:6], 11'b0} + {vid_out, y[2:0]};
+            else vid_addr <= color_table_addr + vid_out[7:5];
           end else if (x_pix == 7) begin
             // Store the color block ready for next character
             screen_color_next <= vid_out;
@@ -246,6 +243,13 @@ module video (
       // Fetch the pattern data, on odd cycles
       if (hc[0] == 1) begin
 	if (hc < HA) begin 
+          // Fetch the patterns for the 4 sprites
+	  if (x_pix < 5) begin
+            if (x_pix  < 4)
+              vid_addr <= sprite_pattern_table_addr + (sprite_pattern[x_pix] << 3) + y[2:0];
+            if (x_pix > 0) 
+              next_sprite_line[x_pix - 1] <= vid_out;
+          end
           // Fetch the font for screen mode 1 to 3
           if (x_pix == 5) begin
             // Set address for next character
@@ -257,8 +261,11 @@ module video (
           end else if (x_pix == 7) begin
             // Store the font line (or colors for mode 3) ready for next character
             font_line <= vid_out;
-	    // For mode 2, set screen color for next block
-	    if (mode == 2) screen_color <= screen_color_next;
+	    // For modeis 1 or  2, set screen color for next block
+	    if (mode == 1 || mode == 2) begin
+              screen_color <= screen_color_next;
+	      for(i=0;i<4;i=i+1) sprite_line[i] <= next_sprite_line[i];
+	    end
 	  end
         end else begin // Read sprite attributes and patterns
 	  if (hc < HA + 32) vid_addr <= sprite_attr_addr + hc[4:1];
@@ -270,9 +277,6 @@ module video (
 	      3: sprite_color[(hc[5:1]-1) >> 2] <= vid_out[3:0];
 	    endcase
 	  end
-          if (hc >= HA + 32 && hc < HA + 96)
-            vid_addr <= sprite_pattern_table_addr + (sprite_pattern[hc[5:4]] << 3) + hc[3:1];
-	  if (hc >= HA + 34 && hc < HA + 98) sprite_patterns[hc[6:1] - 1] <= vid_out;
 	end
       end
 
@@ -281,9 +285,7 @@ module video (
       for (i=0; i<4; i=i+1) begin
         if (sprite_y[i] < 192 && y >= sprite_y[i] && y < sprite_y[i] + (8 << sprite_enlarged)) begin
           if (x >= sprite_x[i] && x < sprite_x[i] + (8 << sprite_enlarged)) begin
-	    if (sprite_row[i][~sprite_col[i]]) begin
-              sprite_pixel[i] <= 1;
-            end
+	    sprite_pixel[i] <= (sprite_line[i][~sprite_col[i]]);
 	  end
         end
       end
