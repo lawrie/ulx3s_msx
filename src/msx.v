@@ -388,6 +388,6 @@ module msx (
 
   assign leds = {led4, led3, led2, led1};
 
-  always @(posedge cpuClock) diag16 <= color_table_addr;
+  always @(posedge cpuClock) if (status[6] && status[4:0] != 0) diag16 <= status;
 
 endmodule

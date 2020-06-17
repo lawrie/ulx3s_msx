@@ -110,15 +110,17 @@ module video (
   reg [7:0] font_line;
   
   reg [3:0] sprite_pixel;
-  
+  reg       sprites_done;
+  reg [2:0] num_sprites;
+
   // Sprite collision count
   wire [2:0] sprite_count = sprite_pixel[3] + sprite_pixel[2] + 
 	                    sprite_pixel[1] + sprite_pixel[0];
 
   // Sprite collision status data
   assign sprite_collision  = (sprite_count > 1);
-  assign too_many_sprites = 0;
-  assign sprite5 = 0;
+  assign too_many_sprites = (num_sprites > 4);
+  reg [4:0] sprite5;
 
   // Set CPU interrupt flag
   assign n_int = !INT;
@@ -207,6 +209,7 @@ module video (
   always @(posedge clk) if (video_on) begin
     if (mode == 0) begin
       sprite_pixel <= 0;
+      num_sprites <= 0;
       if (hc[0] == 1) begin
         if (x_pix == 3) begin
           // Set address for next character
@@ -272,8 +275,8 @@ module video (
 	    end
 	  end
         end else begin // Read sprite attributes and patterns
-	  if (hc < HA + 32) vid_addr <= sprite_attr_addr + hc[4:1];
-	  if (hc >= HA + 2 && hc < HA + 34) begin
+	  if (hc >= HA + 64 && hc < HA + 96) vid_addr <= sprite_attr_addr + hc[4:1];
+	  if (hc >= HA + 66 && hc < HA + 98) begin
 	    case ((hc[3:1] - 1) & 2'b11)
               0: sprite_y[(hc[5:1]-1) >> 2] <= vid_out;
 	      1: sprite_x[(hc[5:1]-1) >> 2] <= vid_out;
@@ -281,6 +284,31 @@ module video (
 	      3: sprite_color[(hc[5:1]-1) >> 2] <= vid_out[3:0];
 	    endcase
 	  end
+	end
+      end
+
+      // At end of line, scan for sprites in next line
+      if (hc[0]) begin
+        if (hc == HA - 1) begin
+          num_sprites <= 0;
+	  sprites_done <= 0;
+	  sprite5 <= 5'h1f;
+	end
+	// Look at up to 32 sprites
+	if (hc >= HA && hc < HA + 64) begin
+          // Fetch y attribute
+          vid_addr <= sprite_attr_addr + (hc[5:1] << 2);
+	end
+	if (hc >= HA + 2 && hc < HA + 66 && !sprites_done) begin
+	   if (vid_out == 209) sprites_done <= 1;
+           if (vid_out < 208 && (y+1) >= vid_out && 
+               (y+1) < vid_out + ((8 << sprite_enlarged) << sprite_large)) begin
+             num_sprites <= num_sprites + 1;
+             if (num_sprites == 4) begin
+               sprite5 <= hc[5:1];
+               sprites_done <= 1;
+             end
+	   end
 	end
       end
 
