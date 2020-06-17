@@ -245,8 +245,12 @@ module video (
 	if (hc < HA) begin 
           // Fetch the patterns for the 4 sprites
 	  if (x_pix < 5) begin
-            if (x_pix  < 4)
-              vid_addr <= sprite_pattern_table_addr + (sprite_pattern[x_pix] << 3) + y[2:0];
+            if (x_pix  < 4) begin
+              if (sprite_large)
+                vid_addr <= sprite_pattern_table_addr + (sprite_pattern[x_pix] << 5) + y[3:0];
+              else
+                vid_addr <= sprite_pattern_table_addr + (sprite_pattern[x_pix] << 3) + y[2:0];
+            end
             if (x_pix > 0) 
               next_sprite_line[x_pix - 1] <= vid_out;
           end
@@ -283,8 +287,9 @@ module video (
       // Look for up to 4 sprites on the current line
       sprite_pixel <= 0;
       for (i=0; i<4; i=i+1) begin
-        if (sprite_y[i] < 192 && y >= sprite_y[i] && y < sprite_y[i] + (8 << sprite_enlarged)) begin
-          if (x >= sprite_x[i] && x < sprite_x[i] + (8 << sprite_enlarged)) begin
+        if (sprite_y[i] < 208 && y >= sprite_y[i] && 
+            y < sprite_y[i] + ((8 << sprite_enlarged) << sprite_large)) begin
+          if (x >= sprite_x[i] && x < sprite_x[i] + ((8 << sprite_enlarged) << sprite_large)) begin
 	    sprite_pixel[i] <= (sprite_line[i][~sprite_col[i]]);
 	  end
         end
