@@ -149,6 +149,7 @@ module video (
   reg [2:0] x_pix;
 
   wire [3:0] char_width = (mode == 0 ? 6 : 8);
+  wire [4:0] next_char = x_char + 1;
 
   // Calculate the border
   wire hBorder = (hc < (HB + HBadj) || hc >= HA - HB);
@@ -232,10 +233,10 @@ module video (
           // Get the colors for mode 2
           if (x_pix == 5) begin
             // Set address for next character
-            vid_addr <= name_table_addr + (y[7:3] * 32 + x_char + 1);
+            vid_addr <= name_table_addr + {y[7:3], next_char};
           end else if (x_pix == 6) begin
             // Set address for next color block
-            vid_addr <= color_table_addr + (y[7:6] * 14'h800) + {vid_out, y[2:0]};
+            vid_addr <= color_table_addr + {y[7:6], 11'b0} + {vid_out, y[2:0]};
           end else if (x_pix == 7) begin
             // Store the color block ready for next character
             screen_color_next <= vid_out;
@@ -248,11 +249,11 @@ module video (
           // Fetch the font for screen mode 1 to 3
           if (x_pix == 5) begin
             // Set address for next character
-            vid_addr <= name_table_addr + (y[7:3] * 32 + x_char + 1);
+            vid_addr <= name_table_addr + {y[7:3], next_char};
           end else if (x_pix == 6) begin
             // Set address for font line, 3 blocks if mode == 2
 	    if (mode == 3) vid_addr <= font_addr + {vid_out, y[4:2]};
-            else vid_addr <= font_addr + (mode == 2 ? (y[7:6] * 14'h800) : 0) +  {vid_out, y[2:0]};
+            else vid_addr <= font_addr + (mode == 2 ? {y[7:6] , 11'b0} : 13'b0) +  {vid_out, y[2:0]};
           end else if (x_pix == 7) begin
             // Store the font line (or colors for mode 3) ready for next character
             font_line <= vid_out;
