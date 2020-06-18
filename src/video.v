@@ -40,7 +40,7 @@ module video (
   parameter HFP = 16;
   parameter HBP = 48;
   parameter HT  = HA + HS + HFP + HBP;
-  parameter HB = 80;
+  parameter HB = 64;
   parameter HB2 = HB/2;
   parameter HBadj = 12; // Border adjustment
 
@@ -157,7 +157,8 @@ module video (
   wire [4:0] next_char = x_char + 1;
 
   // Calculate the border
-  wire hBorder = (hc < (HB + HBadj) || hc >= HA - HB);
+  wire [9:0] hb_adj = (mode == 0 ? HBadj : 0);
+  wire hBorder = (hc < (HB + hb_adj) || hc >= HA - HB - hb_adj);
   wire vBorder = (vc < VB || vc >= VA - VB);
   wire border = hBorder || vBorder;
 
