@@ -323,12 +323,14 @@ module msx (
   reg  r_interrupt_flag, r_sprite_collision;
   reg  r_status_read;
   wire [7:0] status = {r_interrupt_flag, too_many_sprites, r_sprite_collision, (too_many_sprites ? sprite5 : 5'b11111)};
+  wire [7:0] joystick = {2'b0, ~btn[2:1], ~btn[6:3]};
 
   assign cpuDataIn =  cpuAddress[7:0] == 8'ha8 && n_ioRD == 1'b0 ? ppi_port_a :
                       cpuAddress[7:0] == 8'ha9 && n_ioRD == 1'b0 ? ppi_port_b :
                       cpuAddress[7:0] == 8'haa && n_ioRD == 1'b0 ? ppi_port_c :
                       cpuAddress[7:0] == 8'h98 && n_ioRD == 1'b0 ? vga_dout :
                       cpuAddress[7:0] == 8'h99 && n_ioRD == 1'b0 ? status :
+		      cpuAddress[7:0] == 8'ha2 && n_ioRD == 1'b0 && r_psg == 14 ? joystick :
                       ramOut;
 
   always @(posedge cpuClock) begin
@@ -341,7 +343,7 @@ module msx (
       if (cpuClockEdge) begin
         r_status_read <= cpuAddress[7:0] == 8'h99 && n_ioRD == 1'b0;
         if (r_status_read && !(cpuAddress[7:0] == 8'h99 && n_ioRD == 1'b0)) begin
-          //r_interrupt_flag <= 0;
+          r_interrupt_flag <= 0;
           r_sprite_collision <= 0;
         end
       end
