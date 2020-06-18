@@ -238,13 +238,13 @@ module msx (
       if (cpuAddress[7:0] == 8'h99 && n_ioWR == 1'b0) begin
         is_second_addr_byte <= ~is_second_addr_byte;
         if (is_second_addr_byte) begin
-	  if (!cpuDataOut[7]) begin
+          if (!cpuDataOut[7]) begin
             vga_addr <=  {cpuDataOut[5:0], first_addr_byte};
           end else begin
             if (cpuDataOut[5:0] < 8) begin
               r_vdp[cpuDataOut[5:0]] <= first_addr_byte;
-	    end
-	  end
+            end
+          end
         end else begin
           first_addr_byte <= cpuDataOut;
         end
@@ -327,8 +327,8 @@ module msx (
   assign cpuDataIn =  cpuAddress[7:0] == 8'ha8 && n_ioRD == 1'b0 ? ppi_port_a :
                       cpuAddress[7:0] == 8'ha9 && n_ioRD == 1'b0 ? ppi_port_b :
                       cpuAddress[7:0] == 8'haa && n_ioRD == 1'b0 ? ppi_port_c :
-		      cpuAddress[7:0] == 8'h98 && n_ioRD == 1'b0 ? vga_dout :
-		      cpuAddress[7:0] == 8'h99 && n_ioRD == 1'b0 ? status :
+                      cpuAddress[7:0] == 8'h98 && n_ioRD == 1'b0 ? vga_dout :
+                      cpuAddress[7:0] == 8'h99 && n_ioRD == 1'b0 ? status :
                       ramOut;
 
   always @(posedge cpuClock) begin
@@ -343,7 +343,7 @@ module msx (
         if (r_status_read && !(cpuAddress[7:0] == 8'h99 && n_ioRD == 1'b0)) begin
           //r_interrupt_flag <= 0;
           r_sprite_collision <= 0;
-	end
+        end
       end
     end
   end

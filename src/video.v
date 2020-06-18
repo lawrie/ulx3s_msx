@@ -96,6 +96,7 @@ module video (
   reg [7:0] sprite_x [0:3];
   reg [3:0] sprite_color [0:3];
   reg [7:0] sprite_pattern [0:3];
+  reg [3:0] sprite_ec;
   reg [4:0] sprite_num [0:3];
   reg [7:0] next_sprite_line [0:3];
   reg [7:0] sprite_line [0:3];
@@ -282,7 +283,10 @@ module video (
               0: sprite_y[(hc[5:1]-1) >> 2] <= vid_out;
               1: sprite_x[(hc[5:1]-1) >> 2] <= vid_out;
               2: sprite_pattern[(hc[5:1]-1) >> 2] <= vid_out;
-              3: sprite_color[(hc[5:1]-1) >> 2] <= vid_out[3:0];
+              3: begin
+                   sprite_color[(hc[5:1]-1) >> 2] <= vid_out[3:0];
+                   sprite_ec[(hc[5:1]-1) >> 2] <= vid_out[7];
+                 end
             endcase
           end else if (hc == HA + 99) begin
             if (num_sprites < 4) sprite_y[num_sprites] <= 209; // Terminate sprite list
