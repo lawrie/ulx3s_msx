@@ -96,7 +96,7 @@ module video (
   reg [7:0] sprite_x [0:3];
   reg [3:0] sprite_color [0:3];
   reg [7:0] sprite_pattern [0:3];
-  reg [5:0] sprite_num [0:3];
+  reg [4:0] sprite_num [0:3];
   reg [7:0] next_sprite_line [0:3];
   reg [7:0] sprite_line [0:3];
 
@@ -115,7 +115,7 @@ module video (
 
   // Sprite collision count
   wire [2:0] sprite_count = sprite_pixel[3] + sprite_pixel[2] + 
-	                    sprite_pixel[1] + sprite_pixel[0];
+             sprite_pixel[1] + sprite_pixel[0];
 
   // Sprite collision status data
   assign sprite_collision  = (sprite_count > 1);
@@ -226,8 +226,8 @@ module video (
       if (mode == 1 || mode == 2) begin
         // In screen mode 1, 32 entries in color table specify the colors for
         // groups of 8 characters.
-	// In screen mode 2, there are two colors for each line of 8 pixels,
-	// the screen is 256x192 pixels
+        // In screen mode 2, there are two colors for each line of 8 pixels,
+        // the screen is 256x192 pixels
         if (hc[0] == 0 && hc < HA) begin
           // Get the colors
           if (x_pix == 5) begin
@@ -240,14 +240,14 @@ module video (
           end else if (x_pix == 7) begin
             // Store the color block ready for next character
             screen_color_next <= vid_out;
-	  end
-	end
+          end
+        end
       end
       // Fetch the pattern data, on odd cycles
       if (hc[0] == 1) begin
-	if (hc < HA) begin 
+        if (hc < HA) begin 
           // Fetch the patterns for the 4 sprites
-	  if (x_pix < 5) begin
+          if (x_pix < 5) begin
             if (x_pix  < 4) begin
               if (sprite_large)
                 vid_addr <= sprite_pattern_table_addr + (sprite_pattern[x_pix] << 5) + y[3:0];
@@ -263,53 +263,58 @@ module video (
             vid_addr <= name_table_addr + {y[7:3], next_char};
           end else if (x_pix == 6) begin
             // Set address for font line, 3 blocks if mode == 2
-	    if (mode == 3) vid_addr <= font_addr + {vid_out, y[4:2]};
+            if (mode == 3) vid_addr <= font_addr + {vid_out, y[4:2]};
             else vid_addr <= font_addr + (mode == 2 ? {y[7:6] , 11'b0} : 13'b0) +  {vid_out, y[2:0]};
           end else if (x_pix == 7) begin
             // Store the font line (or colors for mode 3) ready for next character
             font_line <= vid_out;
-	    // For modeis 1 or  2, set screen color for next block
-	    if (mode == 1 || mode == 2) begin
+            // For modeis 1 or  2, set screen color for next block
+            if (mode == 1 || mode == 2) begin
               screen_color <= screen_color_next;
-	      for(i=0;i<4;i=i+1) sprite_line[i] <= next_sprite_line[i];
-	    end
-	  end
+              for(i=0;i<4;i=i+1) sprite_line[i] <= next_sprite_line[i];
+            end
+          end
         end else begin // Read sprite attributes and patterns
-	  if (hc >= HA + 64 && hc < HA + 96) vid_addr <= sprite_attr_addr + hc[4:1];
-	  if (hc >= HA + 66 && hc < HA + 98) begin
-	    case ((hc[3:1] - 1) & 2'b11)
+          if (hc >= HA + 64 && hc < HA + 96) 
+            vid_addr <= sprite_attr_addr + (sprite_num[hc[4:3]] << 2) + hc[2:1];
+          if (hc >= HA + 66 && hc < HA + 98) begin
+            case ((hc[3:1] - 1) & 2'b11)
               0: sprite_y[(hc[5:1]-1) >> 2] <= vid_out;
-	      1: sprite_x[(hc[5:1]-1) >> 2] <= vid_out;
-	      2: sprite_pattern[(hc[5:1]-1) >> 2] <= vid_out;
-	      3: sprite_color[(hc[5:1]-1) >> 2] <= vid_out[3:0];
-	    endcase
-	  end
-	end
+              1: sprite_x[(hc[5:1]-1) >> 2] <= vid_out;
+              2: sprite_pattern[(hc[5:1]-1) >> 2] <= vid_out;
+              3: sprite_color[(hc[5:1]-1) >> 2] <= vid_out[3:0];
+            endcase
+          end else if (hc == HA + 99) begin
+            if (num_sprites < 4) sprite_y[num_sprites] <= 209; // Terminate sprite list
+          end
+        end
       end
 
       // At end of line, scan for sprites in next line
       if (hc[0]) begin
         if (hc == HA - 1) begin
           num_sprites <= 0;
-	  sprites_done <= 0;
-	  sprite5 <= 5'h1f;
-	end
-	// Look at up to 32 sprites
-	if (hc >= HA && hc < HA + 64) begin
+          sprites_done <= 0;
+          sprite5 <= 5'h1f;
+        end
+        // Look at up to 32 sprites
+        if (hc >= HA && hc < HA + 64) begin
           // Fetch y attribute
           vid_addr <= sprite_attr_addr + (hc[5:1] << 2);
-	end
-	if (hc >= HA + 2 && hc < HA + 66 && !sprites_done) begin
-	   if (vid_out == 209) sprites_done <= 1;
+        end
+        if (hc >= HA + 2 && hc < HA + 66 && !sprites_done) begin
+           if (vid_out == 209) sprites_done <= 1;
            if (vid_out < 208 && (y+1) >= vid_out && 
                (y+1) < vid_out + ((8 << sprite_enlarged) << sprite_large)) begin
-             num_sprites <= num_sprites + 1;
-             if (num_sprites == 4) begin
-               sprite5 <= hc[5:1];
+             if (num_sprites < 4) begin
+               sprite_num[num_sprites] <= hc[5:1] - 1;
+               num_sprites <= num_sprites + 1;
+             end  else begin
+               sprite5 <= hc[5:1] - 1;
                sprites_done <= 1;
              end
-	   end
-	end
+          end
+        end
       end
 
       // Look for up to 4 sprites on the current line
@@ -318,8 +323,8 @@ module video (
         if (sprite_y[i] < 208 && y >= sprite_y[i] && 
             y < sprite_y[i] + ((8 << sprite_enlarged) << sprite_large)) begin
           if (x >= sprite_x[i] && x < sprite_x[i] + ((8 << sprite_enlarged) << sprite_large)) begin
-	    sprite_pixel[i] <= (sprite_line[i][~sprite_col[i]]);
-	  end
+            sprite_pixel[i] <= (sprite_line[i][~sprite_col[i]]);
+          end
         end
       end
     end
@@ -327,12 +332,12 @@ module video (
 
   // Set the pixel from highest priority plane 
   wire [3:0] pixel_color = sprite_pixel[0] ? sprite_color[0] : 
-	                   sprite_pixel[1] ? sprite_color[1] :
-			   sprite_pixel[2] ? sprite_color[2] :
-			   sprite_pixel[3] ? sprite_color[3] : 
-	                   mode == 0 ? (font_line[~x_pix] ? text_color : back_color) :
-			   mode == 3 ? (x_pix < 4 ? font_line[7:4] : font_line[3:0]) :
-			   font_line[~x_pix] ? screen_color[7:4] : screen_color[3:0];
+                           sprite_pixel[1] ? sprite_color[1] :
+                           sprite_pixel[2] ? sprite_color[2] :
+                           sprite_pixel[3] ? sprite_color[3] : 
+                           mode == 0 ? (font_line[~x_pix] ? text_color : back_color) :
+                           mode == 3 ? (x_pix < 4 ? font_line[7:4] : font_line[3:0]) :
+                           font_line[~x_pix] ? screen_color[7:4] : screen_color[3:0];
   
   // Set the 24-bit color value, taking border into account
   wire [23:0] color = colors[border ? back_color : pixel_color];
