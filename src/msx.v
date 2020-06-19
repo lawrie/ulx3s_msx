@@ -405,21 +405,6 @@ module msx (
     .gpdi_dp(gpdi_dp),
     .gpdi_dn(gpdi_dn)
   );
-/*
-  // Convert VGA to HDMI
-  HDMI_out vga2dvid (
-    .pixclk(clk_vga),
-    .pixclk_x5(clk_hdmi),
-    .red  (red),
-    .green(green),
-    .blue (blue),
-    .vde(vga_de),
-    .hSync(hSync),
-    .vSync(vSync),
-    .gpdi_dp(gpdi_dp),
-    .gpdi_dn(gpdi_dn)
-  );
-*/
   // ===============================================================
   // MEMORY READ/WRITE LOGIC
   // ===============================================================
