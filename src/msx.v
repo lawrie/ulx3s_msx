@@ -232,9 +232,10 @@ module msx (
   )
   rom8 (
     .clk(cpuClock),
+    .we_b(spi_ram_wr && spi_ram_addr[31:24] == 8'h00),   // To be used by OSD
+    .addr_b(spi_ram_addr[13:0]),
+    .din_b(spi_ram_di),
     .addr(cpuAddress[13:0]),
-    .we(1'b0),   // To be used by OSD
-    .din(8'b0),
     .dout(romOut)
   );
 

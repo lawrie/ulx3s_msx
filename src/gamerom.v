@@ -1,9 +1,10 @@
 module gamerom (
   input            clk,
   input [13:0]     addr,
-  input            we,
-  input [7:0]      din,
   output reg [7:0] dout,
+  input            we_b,
+  input [7:0]      din_b,
+  input [15:0]     addr_b
 );
 
   parameter MEM_INIT_FILE = "";
@@ -15,9 +16,12 @@ module gamerom (
       $readmemh(MEM_INIT_FILE, rom);
    
   always @(posedge clk) begin
-    if (we)
-      rom[addr] <= din;
     dout <= rom[addr];
+  end
+
+  always @(posedge clk) begin
+    if (we_b)
+      ram[addr_b] <= din_b;
   end
 
 endmodule
