@@ -109,14 +109,30 @@ module msx (
   // System Clock generation
   // ===============================================================
   wire clk_hdmi, clk_vga;
-
+/*
   pll pll_i (
     .clkin(clk25_mhz),
     .clkout0(clk_hdmi),
     .clkout1(clk_vga),
     .clkout2(cpuClock)
   );
-
+*/
+  wire [3:0] clocks;
+  ecp5pll
+  #(
+      .in_hz( 25*1000000),
+    .out0_hz(125*1000000),
+    .out1_hz( 25*1000000),
+    .out2_hz(   28409000), .out2_tol_hz(100)
+  )
+  ecp5pll_inst
+  (
+    .clk_i(clk25_mhz),
+    .clk_o(clocks)
+  );
+  assign clk_hdmi  = clocks[0];
+  assign clk_vga   = clocks[1];
+  assign cpuClock  = clocks[2];
   // ===============================================================
   // Reset generation
   // ===============================================================
