@@ -188,7 +188,9 @@ module msx (
   // ===============================================================
   wire [15:0] pc;
   
-  wire n_hard_reset = pwr_up_reset_n & btn[0];
+  reg n_hard_reset;
+  always @(posedge cpuClock)
+    n_hard_reset <= pwr_up_reset_n & btn[0] & ~R_cpu_control[0];
 
   tv80n cpu1 (
     .reset_n(n_hard_reset),
