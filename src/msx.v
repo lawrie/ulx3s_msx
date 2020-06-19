@@ -36,9 +36,6 @@ module msx (
   parameter c_vga_out = 0;
   parameter c_diag = 1;
 
-  // Used for interrupt to ESP32
-  assign wifi_gpio0 = 0;
-
   // pull-ups for us2 connector 
   assign usb_fpga_pu_dp = 1;
   assign usb_fpga_pu_dn = 1;
@@ -98,7 +95,6 @@ module msx (
   wire          n_int;
 
   reg [3:0]     cpuClockCount;
-  wire          cpuClock;
   wire          cpuClockEnable;
   reg           cpuClockEnable1; 
   wire          cpuClockEdge = cpuClockEnable && !cpuClockEnable1;
@@ -108,15 +104,6 @@ module msx (
   // ===============================================================
   // System Clock generation
   // ===============================================================
-  wire clk_hdmi, clk_vga;
-/*
-  pll pll_i (
-    .clkin(clk25_mhz),
-    .clkout0(clk_hdmi),
-    .clkout1(clk_vga),
-    .clkout2(cpuClock)
-  );
-*/
   wire [3:0] clocks;
   ecp5pll
   #(
@@ -130,9 +117,61 @@ module msx (
     .clk_i(clk25_mhz),
     .clk_o(clocks)
   );
-  assign clk_hdmi  = clocks[0];
-  assign clk_vga   = clocks[1];
-  assign cpuClock  = clocks[2];
+  wire clk_hdmi = clocks[0];
+  wire clk_vga  = clocks[1];
+  wire cpuClock = clocks[2];
+
+  // ===============================================================
+  // Joystick for OSD control and games
+  // ===============================================================
+
+  reg [6:0] R_btn_joy;
+  always @(posedge cpuClock)
+    R_btn_joy <= btn;
+
+  // ===============================================================
+  // SPI Slave for RAM and CPU control
+  // ===============================================================
+
+  wire        spi_ram_wr, spi_ram_rd;
+  wire [31:0] spi_ram_addr;
+  wire  [7:0] spi_ram_di;
+  wire  [7:0] spi_ram_do = ramOut;
+
+  assign sd_d[0] = 1'bz;
+  assign sd_d[3] = 1'bz; // FPGA pin pullup sets SD card inactive at SPI bus
+
+  wire irq;
+  spi_ram_btn
+  #(
+    .c_sclk_capable_pin(1'b0),
+    .c_addr_bits(32)
+  )
+  spi_ram_btn_inst
+  (
+    .clk(cpuClock),
+    .csn(~wifi_gpio5),
+    .sclk(wifi_gpio16),
+    .mosi(sd_d[1]), // wifi_gpio4
+    .miso(sd_d[2]), // wifi_gpio12
+    .btn(R_btn_joy),
+    .irq(irq),
+    .wr(spi_ram_wr),
+    .rd(spi_ram_rd),
+    .addr(spi_ram_addr),
+    .data_in(spi_ram_do),
+    .data_out(spi_ram_di)
+  );
+  // Used for interrupt to ESP32
+  assign wifi_gpio0 = ~irq;
+
+  reg [7:0] R_cpu_control;
+  always @(posedge cpuClock) begin
+    if (spi_ram_wr && spi_ram_addr[31:24] == 8'hFF) begin
+      R_cpu_control <= spi_ram_di;
+    end
+  end
+
   // ===============================================================
   // Reset generation
   // ===============================================================
@@ -327,6 +366,46 @@ module msx (
     .diag(vga_diag)
   );
 
+  // ===============================================================
+  // SPI Slave for OSD display
+  // ===============================================================
+
+  wire [7:0] osd_vga_r, osd_vga_g, osd_vga_b;
+  wire osd_vga_hsync, osd_vga_vsync, osd_vga_blank;
+  spi_osd
+  #(
+    .c_start_x(62), .c_start_y(80),
+    .c_chars_x(64), .c_chars_y(20),
+    .c_init_on(0),
+    .c_char_file("osd.mem"),
+    .c_font_file("font_bizcat8x16.mem")
+  )
+  spi_osd_inst
+  (
+    .clk_pixel(clk_vga), .clk_pixel_ena(1),
+    .i_r(red  ),
+    .i_g(green),
+    .i_b(blue ),
+    .i_hsync(~hSync), .i_vsync(~vSync), .i_blank(~vga_de),
+    .i_csn(~wifi_gpio5), .i_sclk(wifi_gpio16), .i_mosi(sd_d[1]), // .o_miso(),
+    .o_r(osd_vga_r), .o_g(osd_vga_g), .o_b(osd_vga_b),
+    .o_hsync(osd_vga_hsync), .o_vsync(osd_vga_vsync), .o_blank(osd_vga_blank)
+  );
+
+  // Convert VGA to HDMI
+  HDMI_out vga2dvid (
+    .pixclk(clk_vga),
+    .pixclk_x5(clk_hdmi),
+    .red  (osd_vga_r),
+    .green(osd_vga_g),
+    .blue (osd_vga_b),
+    .vde  (~osd_vga_blank),
+    .hSync(~osd_vga_hsync),
+    .vSync(~osd_vga_vsync),
+    .gpdi_dp(gpdi_dp),
+    .gpdi_dn(gpdi_dn)
+  );
+/*
   // Convert VGA to HDMI
   HDMI_out vga2dvid (
     .pixclk(clk_vga),
@@ -340,7 +419,7 @@ module msx (
     .gpdi_dp(gpdi_dp),
     .gpdi_dn(gpdi_dn)
   );
-
+*/
   // ===============================================================
   // MEMORY READ/WRITE LOGIC
   // ===============================================================
