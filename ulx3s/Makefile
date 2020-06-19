@@ -1,4 +1,4 @@
-VERILOG = ../src/msx.v ../src/ram.v ../src/vram.v ../src/rom.v \
+VERILOG = ../src/msx.v ../src/ram.v ../src/vram.v ../src/rom.v ../src/gamerom.v \
 	  ../src/Z80/tv80_core.v ../src/Z80/tv80n.v ../src/Z80/tv80_mcode.v \
 	  ../src/Z80/tv80_reg.v ../src/Z80/tv80_alu.v \
 	  ../src/keyboard.v ../src/keymap.v ../src/keyrom.v ../src/keyram.v \

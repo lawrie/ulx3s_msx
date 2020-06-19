@@ -3,6 +3,8 @@ module msx (
   input         clk25_mhz,
   // Buttons
   input [6:0]   btn,
+  // Switches
+  input [3:0]   sw,
   // HDMI
   output [3:0]  gpdi_dp,
   output [3:0]  gpdi_dn,
@@ -101,6 +103,7 @@ module msx (
   reg           cpuClockEnable1; 
   wire          cpuClockEdge = cpuClockEnable && !cpuClockEnable1;
   wire [7:0]    ramOut;
+  wire [7:0]    romOut;
 
   // ===============================================================
   // System Clock generation
@@ -159,10 +162,25 @@ module msx (
   )
   ram64 (
     .clk(cpuClock),
-    .we(!n_memWR),
+    // Slot 0 only
+    .we(ppi_port_a[(2 << cpuAddress[15:14]) - 1 -: 2] == 0 && !n_memWR),
     .addr(cpuAddress),
     .din(cpuDataOut),
     .dout(ramOut)
+  );
+
+  // ===============================================================
+  // GAME ROM
+  // ===============================================================
+  gamerom #(
+    .MEM_INIT_FILE("../roms/bomberman.mem")
+  )
+  rom8 (
+    .clk(cpuClock),
+    .addr(cpuAddress[13:0]),
+    .we(1'b0),   // To be used by OSD
+    .din(8'b0),
+    .dout(romOut)
   );
 
   // ===============================================================
@@ -331,7 +349,10 @@ module msx (
                       cpuAddress[7:0] == 8'h98 && n_ioRD == 1'b0 ? vga_dout :
                       cpuAddress[7:0] == 8'h99 && n_ioRD == 1'b0 ? status :
 		      cpuAddress[7:0] == 8'ha2 && n_ioRD == 1'b0 && r_psg == 14 ? joystick :
-                      ramOut;
+		      // Slot 1, page 1 is cartridge rom
+		      sw[0] && cpuAddress[15:14] == 1   && n_memRD == 1'b0 && ppi_port_a[3:2] == 1 ? romOut :
+		      // Slot 0 only
+                      ppi_port_a[(2 << cpuAddress[15:14]) - 1 -: 2] == 0 ? ramOut: 0;
 
   always @(posedge cpuClock) begin
     if (!n_hard_reset) begin
@@ -390,6 +411,6 @@ module msx (
 
   assign leds = {led4, led3, led2, led1};
 
-  always @(posedge cpuClock) if (status[6] && status[4:0] != 0) diag16 <= status;
+  always @(posedge cpuClock) diag16 <= 0;
 
 endmodule
