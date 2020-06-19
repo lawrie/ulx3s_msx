@@ -3,8 +3,8 @@ module gamerom (
   input [13:0]     addr,
   output reg [7:0] dout,
   input            we_b,
-  input [7:0]      din_b,
-  input [15:0]     addr_b
+  input [13:0]     addr_b,
+  input [7:0]      din_b
 );
 
   parameter MEM_INIT_FILE = "";
@@ -21,7 +21,7 @@ module gamerom (
 
   always @(posedge clk) begin
     if (we_b)
-      ram[addr_b] <= din_b;
+      rom[addr_b] <= din_b;
   end
 
 endmodule
