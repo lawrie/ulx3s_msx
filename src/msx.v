@@ -378,6 +378,7 @@ module msx (
     .c_start_x(62), .c_start_y(80),
     .c_chars_x(64), .c_chars_y(20),
     .c_init_on(0),
+    .c_transparency(1),
     .c_char_file("osd.mem"),
     .c_font_file("font_bizcat8x16.mem")
   )
