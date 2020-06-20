@@ -229,15 +229,12 @@ module msx (
   // ===============================================================
   // GAME ROM
   // ===============================================================
-  gamerom #(
-    .MEM_INIT_FILE("../roms/bomberman.mem")
-  )
-  rom8 (
+  gamerom rom8 (
     .clk(cpuClock),
     .we_b(spi_ram_wr && spi_ram_addr[31:24] == 8'h00),   // To be used by OSD
-    .addr_b(spi_ram_addr[13:0]),
+    .addr_b(spi_ram_addr[14:0]),
     .din_b(spi_ram_di),
-    .addr(cpuAddress[13:0]),
+    .addr(cpuAddress - 15'h4000),
     .dout(romOut)
   );
 
@@ -435,6 +432,8 @@ module msx (
 		      cpuAddress[7:0] == 8'ha2 && n_ioRD == 1'b0 && r_psg == 14 ? joystick :
 		      // Slot 1, page 1 is cartridge rom
 		      sw[0] && cpuAddress[15:14] == 1   && n_memRD == 1'b0 && ppi_port_a[3:2] == 1 ? romOut :
+		      // Slot 1, page 2
+		      sw[1] && cpuAddress[15:14] == 2   && n_memRD == 1'b0 && ppi_port_a[5:4] == 1 ? romOut :
 		      // Slot 0 only
                       ppi_port_a[(2 << cpuAddress[15:14]) - 1 -: 2] == 0 ? ramOut: 0;
 
