@@ -21,36 +21,36 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>. 
 //
 
-module sdram (
-
+module sdram
+(
 	// interface to the MT48LC16M16 chip
-  input [15:0] sd_data_in,
-  output [15:0] sd_data_out,
-	output [12:0]   sd_addr,    // 13 bit multiplexed address bus
-	output  [1:0]   sd_dqm,     // two byte masks
-	output  [1:0]   sd_ba,      // two banks
-	output          sd_cs,      // a single chip select
-	output          sd_we,      // write enable
-	output          sd_ras,     // row address select
-	output          sd_cas,     // columns address select
+        input     [15:0] sd_data_in,
+        output    [15:0] sd_data_out,
+	output    [12:0] sd_addr,    // 13 bit multiplexed address bus
+	output     [1:0] sd_dqm,     // two byte masks
+	output     [1:0] sd_ba,      // two banks
+	output           sd_cs,      // a single chip select
+	output           sd_we,      // write enable
+	output           sd_ras,     // row address select
+	output           sd_cas,     // columns address select
 
 	// cpu/chipset interface
-	input 		 		init,       // init signal after FPGA config to initialize RAM
-	input 		 		clk,        // sdram is accessed at up to 128MHz
-	input               clkref,     // reference clock to sync to
-  output        we_out, // Tristate control signal
+	input            init,       // init signal after FPGA config to initialize RAM
+	input            clk,        // sdram is accessed at up to 128MHz
+	input            clkref,     // reference clock to sync to
+	output           we_out, // Tristate control signal
 	
-	input [24:0]        addrA,      // 25 bit byte address
-	input               weA,        // cpu/chipset requests write
-	input [7:0]         dinA,       // data input from chipset/cpu
-	input               oeA,        // cpu requests data
-	output reg [7:0]    doutA,      // data output to cpu
+	input     [24:0] addrA,      // 25 bit byte address
+	input            weA,        // cpu/chipset requests write
+	input      [7:0] dinA,       // data input from chipset/cpu
+	input            oeA,        // cpu requests data
+	output reg [7:0] doutA,      // data output to cpu
 
-	input [24:0]        addrB,      // 25 bit byte address
-	input               weB,        // cpu/chipset requests write
-	input [7:0]         dinB,       // data input from chipset/cpu
-	input               oeB,        // ppu requests data
-	output reg [7:0]    doutB       // data output to ppu
+	input     [24:0] addrB,      // 25 bit byte address
+	input            weB,        // cpu/chipset requests write
+	input      [7:0] dinB,       // data input from chipset/cpu
+	input            oeB,        // ppu requests data
+	output reg [7:0] doutB       // data output to ppu
 );
 
 // no burst configured

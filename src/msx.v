@@ -1,7 +1,6 @@
 `default_nettype none
 module msx
 #(
-  parameter c_cpuclock_hz = 28571428, // Hz
   parameter c_sdram       = 1 // 1:SDRAM, 0:BRAM 32K
 )
 (
@@ -120,31 +119,38 @@ module msx
   // ===============================================================
   // System Clock generation
   // ===============================================================
+  wire clk_sdram_locked;
   wire [3:0] clocks;
   ecp5pll
   #(
       .in_hz( 25*1000000),
     .out0_hz(125*1000000),
     .out1_hz( 25*1000000),
-    .out2_hz(   28409000), .out2_tol_hz(100) // nut used
+    .out2_hz(100*1000000),                // SDRAM core
+    .out3_hz(100*1000000), .out3_deg(120) // SDRAM chip 45-180:ok 10:not
   )
   ecp5pll_inst
   (
     .clk_i(clk25_mhz),
-    .clk_o(clocks)
+    .clk_o(clocks),
+    .locked(clk_sdram_locked)
   );
-  wire clk_hdmi = clocks[0];
-  wire clk_vga  = clocks[1];
-  //wire cpuClock = clocks[2];
+  wire clk_hdmi  = clocks[0];
+  wire clk_vga   = clocks[1];
+  wire cpuClock  = clocks[1];
+  wire clk_sdram = clocks[2];
+  wire sdram_clk = clocks[3]; // phase shifted for chip
 
+/*
+  localparam c_cpuclock_hz = 25*1000000; // Hz
   wire clk_sdram_locked;
   wire [3:0] clocks_sdram;
   ecp5pll
   #(
       .in_hz( 25*1000000),
     .out0_hz(c_cpuclock_hz*4),                .out0_tol_hz(100),
-    .out1_hz(c_cpuclock_hz*4), .out1_deg(90), .out1_tol_hz(100),
-    .out2_hz(c_cpuclock_hz),                  .out1_tol_hz(100)
+    .out1_hz(c_cpuclock_hz*4), .out1_deg(60), .out1_tol_hz(100),
+    .out2_hz(c_cpuclock_hz),                  .out2_tol_hz(100)
   )
   ecp5pll_sdram_inst
   (
@@ -155,7 +161,7 @@ module msx
   wire clk_sdram = clocks_sdram[0];
   wire sdram_clk = clocks_sdram[1]; // phase shifted for chip
   wire cpuClock  = clocks_sdram[2];
-
+*/
   // ===============================================================
   // Joystick for OSD control and games
   // ===============================================================
@@ -278,7 +284,7 @@ module msx
    .sd_data_in(sdram_d_in),
    .sd_data_out(sdram_d_out),
    .sd_addr(sdram_a),
-   .sd_dqm({sdram_dqm[1], sdram_dqm[0]}),
+   .sd_dqm(sdram_dqm),
    .sd_cs(sdram_csn),
    .sd_ba(sdram_ba),
    .sd_we(sdram_wen),
@@ -291,7 +297,8 @@ module msx
    .we_out(sdram_d_wr),
    // cpu/chipset interface
    .weA(0),
-   .addrA(cpuAddress - 15'h4000),
+   //.addrA(cpuAddress - 15'h4000),
+   .addrA({cpuAddress[15:12]-4'h4,cpuAddress[11:0]}),
    .oeA(cpuClockEnable),
    .dinA(0),
    .doutA(romOut),
@@ -535,7 +542,10 @@ module msx
   
   always @(posedge cpuClock) begin
     cpuClockEnable1 <= cpuClockEnable;
-    cpuClockCount <= cpuClockCount + 1;
+    if(cpuClockCount == 6)
+      cpuClockCount <= 0;
+    else
+      cpuClockCount <= cpuClockCount + 1;
   end
 
   assign cpuClockEnable = cpuClockCount[2]; // 3.5Mhz
