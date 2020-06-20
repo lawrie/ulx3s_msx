@@ -180,13 +180,20 @@ class osd:
       if filename.endswith(".nes") \
       or filename.endswith(".snes") \
       or filename.endswith(".smc") \
-      or filename.endswith(".sfc") \
-      or filename.endswith(".mx1"):
+      or filename.endswith(".sfc"):
         import ld_nes
         s=ld_nes.ld_nes(self.spi,self.cs)
         s.ctrl(1)
         s.ctrl(0)
         s.load_stream(open(filename,"rb"),addr=0,maxlen=0x101000)
+        del s
+        gc.collect()
+        self.enable[0]=0
+        self.osd_enable(0)
+      if filename.endswith(".mx1"):
+        import ld_msx
+        s=ld_msx.ld_msx(self.spi,self.cs)
+        s.load_msx_rom(open(filename,"rb"))
         del s
         gc.collect()
         self.enable[0]=0
@@ -351,6 +358,6 @@ class osd:
   #    self.cs.off()
 
 os.mount(SDCard(slot=3),"/sd")
-ecp5.prog("/sd/msx/bitstreams/ulx3s_85f_msx1.bit")
+#ecp5.prog("/sd/msx/bitstreams/ulx3s_85f_msx1.bit")
 gc.collect()
 run=osd()
