@@ -190,7 +190,8 @@ class osd:
         gc.collect()
         self.enable[0]=0
         self.osd_enable(0)
-      if filename.endswith(".mx1"):
+      if (filename.startswith("/sd/msx") and filename.endswith(".rom")) \
+      or filename.endswith(".mx1"):
         import ld_msx
         s=ld_msx.ld_msx(self.spi,self.cs)
         s.load_msx_rom(open(filename,"rb"))
