@@ -127,7 +127,7 @@ module msx
     .out0_hz(125*1000000),
     .out1_hz( 25*1000000),
     .out2_hz(100*1000000),                // SDRAM core
-    .out3_hz(100*1000000), .out3_deg(120) // SDRAM chip 45-180:ok 10:not
+    .out3_hz(100*1000000), .out3_deg(180) // SDRAM chip 45-330:ok 0-30:not
   )
   ecp5pll_inst
   (
@@ -141,27 +141,6 @@ module msx
   wire clk_sdram = clocks[2];
   wire sdram_clk = clocks[3]; // phase shifted for chip
 
-/*
-  localparam c_cpuclock_hz = 25*1000000; // Hz
-  wire clk_sdram_locked;
-  wire [3:0] clocks_sdram;
-  ecp5pll
-  #(
-      .in_hz( 25*1000000),
-    .out0_hz(c_cpuclock_hz*4),                .out0_tol_hz(100),
-    .out1_hz(c_cpuclock_hz*4), .out1_deg(60), .out1_tol_hz(100),
-    .out2_hz(c_cpuclock_hz),                  .out2_tol_hz(100)
-  )
-  ecp5pll_sdram_inst
-  (
-    .clk_i(clk25_mhz),
-    .clk_o(clocks_sdram),
-    .locked(clk_sdram_locked)
-  );
-  wire clk_sdram = clocks_sdram[0];
-  wire sdram_clk = clocks_sdram[1]; // phase shifted for chip
-  wire cpuClock  = clocks_sdram[2];
-*/
   // ===============================================================
   // Joystick for OSD control and games
   // ===============================================================
@@ -542,7 +521,7 @@ module msx
   
   always @(posedge cpuClock) begin
     cpuClockEnable1 <= cpuClockEnable;
-    if(cpuClockCount == 6)
+    if(cpuClockCount == 6) // divide by 7: 25MHz/7 = 3.571MHz
       cpuClockCount <= 0;
     else
       cpuClockCount <= cpuClockCount + 1;
