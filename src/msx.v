@@ -1,5 +1,10 @@
 `default_nettype none
-module msx (
+module msx
+#(
+  parameter c_cpuclock_hz = 28571428, // Hz
+  parameter c_sdram       = 1 // 1:SDRAM, 0:BRAM 32K
+)
+(
   input         clk25_mhz,
   // Buttons
   input [6:0]   btn,
@@ -27,6 +32,17 @@ module msx (
 
   inout  sd_clk, sd_cmd,
   inout   [3:0] sd_d,
+
+  output sdram_csn,       // chip select
+  output sdram_clk,       // clock to SDRAM
+  output sdram_cke,       // clock enable to SDRAM
+  output sdram_rasn,      // SDRAM RAS
+  output sdram_casn,      // SDRAM CAS
+  output sdram_wen,       // SDRAM write-enable
+  output [12:0] sdram_a,  // SDRAM address bus
+  output  [1:0] sdram_ba, // SDRAM bank-address
+  output  [1:0] sdram_dqm,// byte select
+  inout  [15:0] sdram_d,  // data bus to/from SDRAM
 
   inout  [27:0] gp,gn,
   // Leds
@@ -110,7 +126,7 @@ module msx (
       .in_hz( 25*1000000),
     .out0_hz(125*1000000),
     .out1_hz( 25*1000000),
-    .out2_hz(   28409000), .out2_tol_hz(100)
+    .out2_hz(   28409000), .out2_tol_hz(100) // nut used
   )
   ecp5pll_inst
   (
@@ -119,7 +135,26 @@ module msx (
   );
   wire clk_hdmi = clocks[0];
   wire clk_vga  = clocks[1];
-  wire cpuClock = clocks[2];
+  //wire cpuClock = clocks[2];
+
+  wire clk_sdram_locked;
+  wire [3:0] clocks_sdram;
+  ecp5pll
+  #(
+      .in_hz( 25*1000000),
+    .out0_hz(c_cpuclock_hz*4),                .out0_tol_hz(100),
+    .out1_hz(c_cpuclock_hz*4), .out1_deg(90), .out1_tol_hz(100),
+    .out2_hz(c_cpuclock_hz),                  .out1_tol_hz(100)
+  )
+  ecp5pll_sdram_inst
+  (
+    .clk_i(clk25_mhz),
+    .clk_o(clocks_sdram),
+    .locked(clk_sdram_locked)
+  );
+  wire clk_sdram = clocks_sdram[0];
+  wire sdram_clk = clocks_sdram[1]; // phase shifted for chip
+  wire cpuClock  = clocks_sdram[2];
 
   // ===============================================================
   // Joystick for OSD control and games
@@ -231,6 +266,43 @@ module msx (
   // ===============================================================
   // GAME ROM
   // ===============================================================
+  wire sdram_d_wr;
+  wire [15:0] sdram_d_in, sdram_d_out;
+  assign sdram_d = sdram_d_wr ? sdram_d_out : 16'hzzzz;
+  assign sdram_d_in = sdram_d;
+  generate
+  if(c_sdram)
+  sdram
+  sdram_i
+  (
+   .sd_data_in(sdram_d_in),
+   .sd_data_out(sdram_d_out),
+   .sd_addr(sdram_a),
+   .sd_dqm({sdram_dqm[1], sdram_dqm[0]}),
+   .sd_cs(sdram_csn),
+   .sd_ba(sdram_ba),
+   .sd_we(sdram_wen),
+   .sd_ras(sdram_rasn),
+   .sd_cas(sdram_casn),
+   // system interface
+   .clk(clk_sdram),
+   .clkref(cpuClockEnable),
+   .init(!clk_sdram_locked),
+   .we_out(sdram_d_wr),
+   // cpu/chipset interface
+   .weA(0),
+   .addrA(cpuAddress - 15'h4000),
+   .oeA(cpuClockEnable),
+   .dinA(0),
+   .doutA(romOut),
+   // SPI interface
+   .weB(spi_ram_wr && spi_ram_addr[31:24] == 8'h00),
+   .addrB(spi_ram_addr[23:0]),
+   .dinB(spi_ram_di),
+   .oeB(0),
+   .doutB()
+  );
+  else
   gamerom rom8 (
     .clk(cpuClock),
     .we_b(spi_ram_wr && spi_ram_addr[31:24] == 8'h00), // used by OSD
@@ -239,6 +311,7 @@ module msx (
     .addr(cpuAddress - 15'h4000),
     .dout(romOut)
   );
+  endgenerate
 
   // ===============================================================
   // Keyboard
