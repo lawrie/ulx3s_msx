@@ -358,6 +358,6 @@ class osd:
   #    self.cs.off()
 
 os.mount(SDCard(slot=3),"/sd")
-#ecp5.prog("/sd/msx/bitstreams/ulx3s_85f_msx1.bit")
+ecp5.prog("/sd/msx/bitstreams/ulx3s_85f_msx1.bit")
 gc.collect()
 run=osd()
