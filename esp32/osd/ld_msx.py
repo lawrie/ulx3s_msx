@@ -31,18 +31,17 @@ class ld_msx:
   # LOAD/SAVE and CPU control
 
   # read from file -> write to SPI RAM
-  def load_msx_rom(self, filedata, addr=0, maxlen=0x8000, blocksize=1024):
+  def load_msx_rom(self, filedata, addr=0, maxlen=0x10000, blocksize=1024):
     # Request load
     self.cs.on()
     self.spi.write(bytearray([0,(addr >> 24) & 0xFF, (addr >> 16) & 0xFF, (addr >> 8) & 0xFF, addr & 0xFF]))
-    header = bytearray(16)
-    filedata.readinto(header)
-    self.spi.write(header)
     block = bytearray(blocksize)
-    bytes_loaded = len(header)
+    bytes_loaded = 0
     while bytes_loaded < maxlen:
       if filedata.readinto(block):
         self.spi.write(block)
+        if bytes_loaded == 0:
+          header = block[0:16]
         bytes_loaded += blocksize
       else:
         break
