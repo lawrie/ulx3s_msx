@@ -276,8 +276,7 @@ module msx
    .we_out(sdram_d_wr),
    // cpu/chipset interface
    .weA(0),
-   //.addrA(cpuAddress - 15'h4000),
-   .addrA({cpuAddress[15:12]-4'h4,cpuAddress[11:0]}),
+   .addrA({cpuAddress[15:14]- (soft_sw[0] ? 2'b01 : 2'b10), cpuAddress[13:0]}),
    .oeA(cpuClockEnable),
    .dinA(0),
    .doutA(romOut),
