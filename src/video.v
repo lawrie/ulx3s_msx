@@ -342,9 +342,9 @@ module video (
           if (hc >= HA + NUM_SPRITES2 + NUM_ACTIVE_SPRITES8 && 
               hc < HA + NUM_SPRITES2 + NUM_ACTIVE_SPRITES8 + NUM_ACTIVE_SPRITES2)
             if (sprite_large) 
-              vid_addr <= sprite_pattern_table_addr + {sprite_pattern[hc[2:1]][7:2],1'b0, sprite_row[hc[2:1]][3 + sprite_enlarged -: 4]};
+              vid_addr <= sprite_pattern_table_addr + {sprite_pattern[hc[2:1]][7:2],1'b0, sprite_row[hc[2:1]][3:0]};
           else
-            vid_addr <= sprite_pattern_table_addr + {sprite_pattern[hc[2:1]], sprite_row[hc[2:1]][2 + sprite_enlarged  -: 3]};
+            vid_addr <= sprite_pattern_table_addr + {sprite_pattern[hc[2:1]], sprite_row[hc[2:1]][2:0]};
           if (hc >= HA + NUM_SPRITES2 + NUM_ACTIVE_SPRITES* + 2 && 
               hc < HA + NUM_SPRITES2 + NUM_ACTIVE_SPRITES8 + NUM_ACTIVE_SPRITES2 + 2) 
             sprite_font[hc[2:1]-1] <= vid_out;
@@ -352,7 +352,7 @@ module video (
           if (sprite_large) begin
             if (hc >= HA + NUM_SPRITES2 + NUM_ACTIVE_SPRITES8 + NUM_ACTIVE_SPRITES2  && 
                 hc < HA + NUM_SPRITES2 + NUM_ACTIVE_SPRITES8 + NUM_ACTIVE_SPRITES2 + NUM_ACTIVE_SPRITES2) 
-              vid_addr <= sprite_pattern_table_addr + {sprite_pattern[hc[2:1]][7:2],1'b1, sprite_row[hc[2:1]][3 + sprite_enlarged -: 4]};
+              vid_addr <= sprite_pattern_table_addr + {sprite_pattern[hc[2:1]][7:2],1'b1, sprite_row[hc[2:1]][3:0]};
             if (hc >= HA + NUM_SPRITES2 + NUM_ACTIVE_SPRITES8 + NUM_ACTIVE_SPRITES2 + 2 && 
                 hc < HA + NUM_SPRITES2 + NUM_ACTIVE_SPRITES8 + NUM_ACTIVE_SPRITES2 + NUM_ACTIVE_SPRITES2 + 2)
               sprite_font1[hc[2:1]-1] <= vid_out;
