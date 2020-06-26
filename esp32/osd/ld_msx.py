@@ -47,10 +47,11 @@ class ld_msx:
         break
     self.cs.off()
     self.ctrl(1)
-    if header[2] == 0 and header[3] == 0:
-      self.ctrl(0)
-    else:
+    #if header[2] == 0 and header[3] == 0:
+    if (header[3] & 0xF0) == 0x40:
       self.ctrl(16) # 32K ROM soft-switch
+    else:
+      self.ctrl(0)
 
   # read from SPI RAM -> write to file
   def save_stream(self, filedata, addr=0, length=1024, blocksize=1024):
