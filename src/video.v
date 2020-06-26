@@ -263,7 +263,7 @@ module video (
           end else if (x_pix == 6) begin
             // Set address for next color block
             if (mode == 2) vid_addr <= color_table_addr + {y[7:6], 11'b0} + {vid_out, y[2:0]};
-            else vid_addr <= color_table_addr + vid_out[7:5];
+            else vid_addr <= color_table_addr + vid_out[7:3];
           end else if (x_pix == 7) begin
             // Store the color block ready for next character
             screen_color_next <= vid_out;
