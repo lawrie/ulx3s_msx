@@ -242,7 +242,7 @@ module msx
   ram64 (
     .clk(cpuClock),
     // Slot 0 only
-    .we(ppi_port_a[(2 << cpuAddress[15:14]) - 1 -: 2] == 0 && !n_memWR),
+    .we(cpuAddress[15] && ppi_port_a[(2 << cpuAddress[15:14]) - 1 -: 2] == 0 && !n_memWR),
     .addr(cpuAddress),
     .din(cpuDataOut),
     .dout(ramOut)
@@ -360,7 +360,11 @@ module msx
   wire        interrupt_flag;
 
   always @(posedge cpuClock) begin
-    if (cpuClockEdge) begin
+    if (!n_hard_reset) begin
+      ppi_port_a <= 0;
+      ppi_port_c <= 0;
+      is_second_addr_byte <= 0;
+    end else if (cpuClockEdge) begin
       if (cpuAddress[7:0] == 8'ha0 && n_ioWR == 1'b0) r_psg <= cpuDataOut[3:0];
       // VDP interface
       if (vga_wr) vga_addr <= vga_addr + 1;
@@ -552,6 +556,6 @@ module msx
   // ===============================================================
   assign leds = {!n_hard_reset, mode};
 
-  always @(posedge cpuClock) diag16 <= 0;
+  always @(posedge cpuClock) diag16 <= pc;
 
 endmodule
