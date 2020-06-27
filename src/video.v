@@ -126,8 +126,11 @@ module video (
   reg       sprites_done;
   reg [2:0] num_sprites;
 
-  wire [7:0] sprite_y1 [0:NUM_ACTIVE_SPRITES-1];
-  signed wire [8:0] sprite_xec [0:NUM_ACTIVE_SPRITES-1];
+  wire [7:0] sprite_sy1 [0:NUM_ACTIVE_SPRITES+1]; // Start y pos + 1
+  wire [7:0] sprite_ey1 [0:NUM_ACTIVE_SPRITES+1]; // End y pos + 1
+  wire [8:0] sprite_sx  [0:NUM_ACTIVE_SPRITES-1]; // Start x pos 0 - 287
+  wire [8:0] sprite_ex  [0:NUM_ACTIVE_SPRITES+1]; // End y pos of first 8 pixels 
+  wire [8:0] sprite_exl [0:NUM_ACTIVE_SPRITES+1]; // End y pos
 
   // Sprite collision count
   wire [2:0] sprite_count = sprite_pixel[3] + sprite_pixel[2] + 
@@ -174,9 +177,6 @@ module video (
   reg [5:0] x_char;
   reg [2:0] x_pix;
 
-  wire [7:0] next_x = x + 1;
-  wire [7:0] next1_x = x + 2;
-
   wire [3:0] char_width = (mode == 0 ? 6 : 8);
   wire [4:0] next_char = x_char + 1;
 
@@ -206,13 +206,26 @@ module video (
   wire [2:0] sprite_col [0:NUM_ACTIVE_SPRITES-1];
   wire [3:0] sprite_row [0:NUM_ACTIVE_SPRITES-1];
 
+  // Sprite horizontal positions start at -32, and have range 0 - 287
+  wire [7:0] x1 = x + 1;
+  wire [8:0] x33 = (hc - HB + 66) >> 1; // x+1, starting from -32
+  wire [8:0] x34 = (hc - HB + 68) >> 1; // x+2, starting from -32
+
+  wire [7:0] y32 = y + 32;
+  // Start and end sprite position during sprite scan, starting at x-32
+  wire [7:0] sprite_sy = vid_out + 32;
+  wire [7:0] sprite_ey = vid_out + 32  + ((8 << sprite_enlarged) << sprite_large);
+
   generate
     genvar j;
     for(j=0;j<NUM_ACTIVE_SPRITES;j=j+1) begin
-      assign sprite_col[j] = ((next_x - sprite_x[j]) >> sprite_enlarged);
+      assign sprite_col[j] = ((x1 - sprite_x[j]) >> sprite_enlarged);
       assign sprite_row[j] = ((y - sprite_y[j]) >> sprite_enlarged);
-      assign sprite_y1[j] = sprite_y[j] + 1;
-      assign sprite_xec[j] = $signed({1'b0, sprite_x[j]} - (sprite_ec[j] ? 9'd32 : 9'd0));
+      assign sprite_sx[j]  = sprite_x[j] + (sprite_ec[j] ? 0 : 32);
+      assign sprite_ex[j]  = sprite_sx[j] + (8 << sprite_enlarged);
+      assign sprite_exl[j] = sprite_sx[j] + ((8 << sprite_enlarged) << sprite_large);
+      assign sprite_sy1[j] = sprite_y[j] + 33;
+      assign sprite_ey1[j] = sprite_sy1[j] + ((8 << sprite_enlarged) << sprite_large);
     end
   endgenerate
 
@@ -299,15 +312,13 @@ module video (
           sprite_pixel <= 0;
           for(i=0;i<NUM_ACTIVE_SPRITES;i=i+1) if (i < num_sprites) begin
             // Set the sprite fonts
-            if (next1_x == sprite_xec[i])
+            if (x34 == sprite_sx[i])
               sprite_line[i] <= sprite_font[i];
-            if (sprite_large && next1_x == sprite_xec[i] + (8 << sprite_enlarged))
+            if (sprite_large && x34 == sprite_ex[i])
               sprite_line[i] <= sprite_font1[i];
             // Look for up to 4 sprites on the current line
-            if (y >= sprite_y1[i] && 
-                y < sprite_y1[i] + ((8 << sprite_enlarged) << sprite_large)) begin
-              if (next_x >= sprite_xec[i] && 
-                  next_x < sprite_xec[i] + ((8 << sprite_enlarged) << sprite_large))
+            if (y32 >= sprite_sy1[i] && y32 < sprite_ey1[i]) begin
+              if (x33 >= sprite_sx[i] && x33 < sprite_exl[i])
                 sprite_pixel[i] <= (sprite_line[i][~sprite_col[i]]);
             end
           end
@@ -328,8 +339,7 @@ module video (
             // Check if sprite is on the line
             if (hc >= HA + 2 && hc < SPRITE_SCAN_END + 2 && !sprites_done) begin
                if (vid_out == 209) sprites_done <= 1;
-               else if (vid_out < 208 && y >= vid_out && 
-                        y < (vid_out + ((8 << sprite_enlarged) << sprite_large))) begin
+               else if (y32 >= sprite_sy && y32 < sprite_ey) begin
                  if (num_sprites < 4) begin
                    sprite_num[num_sprites] <= hc[5:1] - 1;
                    num_sprites <= num_sprites + 1;
@@ -339,7 +349,7 @@ module video (
                  end
               end
             end
-            // Read the sprite attributes
+            // Read the sprite attributes for the row
             if (hc >= SPRITE_SCAN_END && hc < SPRITE_ATTR_SCAN_END) 
               vid_addr <= sprite_attr_addr + {sprite_num[hc[4:3]], hc[2:1]};
             if (hc >= SPRITE_SCAN_END + 2 && hc < SPRITE_ATTR_SCAN_END + 2) begin
@@ -353,7 +363,7 @@ module video (
                    end
               endcase
             end 
-            // Read the sprite patterns
+            // Read the sprite patterns for the row
             if (hc >= SPRITE_ATTR_SCAN_END && hc < SPRITE_PATTERN_SCAN_END)
               if (sprite_large) 
                 vid_addr <= sprite_pattern_table_addr + 
