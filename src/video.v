@@ -338,7 +338,7 @@ module video (
             end
             // Check if sprite is on the line
             if (hc >= HA + 2 && hc < SPRITE_SCAN_END + 2 && !sprites_done) begin
-               if (vid_out == 209) sprites_done <= 1;
+               if (vid_out == 208) sprites_done <= 1;
                else if (y32 >= sprite_sy && y32 < sprite_ey) begin
                  if (num_sprites < 4) begin
                    sprite_num[num_sprites] <= hc[5:1] - 1;
