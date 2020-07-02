@@ -1,7 +1,9 @@
 `default_nettype none
 module msx
 #(
-  parameter c_sdram       = 1 // 1:SDRAM, 0:BRAM 32K
+  parameter c_sdram       = 1, // 1:SDRAM, 0:BRAM 32K
+  parameter c_vga_out     = 0, // 0; Just HDMI, 1: VGA and HDMI
+  parameter c_diag        = 1  // 0: No led diagnostcs, 1: led diagnostics 
 )
 (
   input         clk25_mhz,
@@ -48,8 +50,18 @@ module msx
   output [7:0]  leds
 );
 
-  parameter c_vga_out = 0;
-  parameter c_diag = 1;
+  // Port numbers
+  wire [7:0] vdp_ctrl_port = 8'h99;
+  wire [7:0] vdp_data_port = 8'h98;
+
+  wire [7:0] psg_reg_write_port = 8'ha0;
+  wire [7:0] psg_val_write_port = 8'ha1;
+  wire [7:0] psg_val_read_port = 8'ha2;
+
+  wire [7:0] ppi_a_port = 8'ha8;
+  wire [7:0] ppi_b_port = 8'ha9;
+  wire [7:0] ppi_c_port = 8'haa;
+  wire [7:0] ppi_cmd_port = 8'hab;
 
   // pull-ups for us2 connector 
   assign usb_fpga_pu_dp = 1;
@@ -340,8 +352,8 @@ module msx
   wire        vga_de;
   wire [7:0]  vga_dout;
   reg  [13:0] vga_addr;
-  wire        vga_wr = cpuAddress[7:0] == 8'h98 && n_ioWR == 1'b0;
-  wire        vga_rd = cpuAddress[7:0] == 8'h98 && n_ioRD == 1'b0;
+  wire        vga_wr = cpuAddress[7:0] == vdp_data_port && n_ioWR == 1'b0;
+  wire        vga_rd = cpuAddress[7:0] == vdp_data_port && n_ioRD == 1'b0;
   reg         is_second_addr_byte = 0;
   reg [7:0]   first_addr_byte;
   reg [7:0]   r_vdp [0:7];
@@ -365,14 +377,14 @@ module msx
       ppi_port_c <= 0;
       is_second_addr_byte <= 0;
     end else if (cpuClockEdge) begin
-      if (cpuAddress[7:0] == 8'ha0 && n_ioWR == 1'b0) r_psg <= cpuDataOut[3:0];
+      if (cpuAddress[7:0] == psg_reg_write_port && n_ioWR == 1'b0) r_psg <= cpuDataOut[3:0];
       // VDP interface
       if (vga_wr) vga_addr <= vga_addr + 1;
       // Increment address on CPU cycle after IO read
       r_vga_rd <= vga_rd;
       if (r_vga_rd && !vga_rd) vga_addr <= vga_addr + 1;
 
-      if (cpuAddress[7:0] == 8'h99 && n_ioWR == 1'b0) begin
+      if (cpuAddress[7:0] == vdp_ctrl_port && n_ioWR == 1'b0) begin
         is_second_addr_byte <= ~is_second_addr_byte;
         if (is_second_addr_byte) begin
           if (!cpuDataOut[7]) begin
@@ -387,11 +399,11 @@ module msx
         end
       end
       // PPI interface
-      if (cpuAddress[7:0] == 8'ha8 && n_ioWR == 1'b0)
+      if (cpuAddress[7:0] == ppi_a_port && n_ioWR == 1'b0)
         ppi_port_a <= cpuDataOut;
-      if (cpuAddress[7:0] == 8'haa && n_ioWR == 1'b0)
+      if (cpuAddress[7:0] == ppi_c_port && n_ioWR == 1'b0)
         ppi_port_c <= cpuDataOut;
-      if (cpuAddress[7:0] == 8'hab && n_ioWR == 1'b0 && !cpuDataOut[7])
+      if (cpuAddress[7:0] == ppi_cmd_port && n_ioWR == 1'b0 && !cpuDataOut[7])
         ppi_port_c[cpuDataOut[3:1]] <= cpuDataOut[0];
     end
   end
@@ -488,16 +500,16 @@ module msx
   wire [7:0] status = {r_interrupt_flag, too_many_sprites, r_sprite_collision, (too_many_sprites ? sprite5 : 5'b11111)};
   wire [7:0] joystick = {2'b0, ~btn[2:1], ~btn[6:3]};
 
-  assign cpuDataIn =  cpuAddress[7:0] == 8'ha8 && n_ioRD == 1'b0 ? ppi_port_a :
-                      cpuAddress[7:0] == 8'ha9 && n_ioRD == 1'b0 ? ppi_port_b :
-                      cpuAddress[7:0] == 8'haa && n_ioRD == 1'b0 ? ppi_port_c :
-                      cpuAddress[7:0] == 8'h98 && n_ioRD == 1'b0 ? vga_dout :
-                      cpuAddress[7:0] == 8'h99 && n_ioRD == 1'b0 ? status :
-		      cpuAddress[7:0] == 8'ha2 && n_ioRD == 1'b0 && r_psg == 14 ? joystick :
+  assign cpuDataIn =  cpuAddress[7:0] == ppi_a_port && n_ioRD == 1'b0 ? ppi_port_a :
+                      cpuAddress[7:0] == ppi_b_port && n_ioRD == 1'b0 ? ppi_port_b :
+                      cpuAddress[7:0] == ppi_c_port && n_ioRD == 1'b0 ? ppi_port_c :
+                      cpuAddress[7:0] == vdp_data_port && n_ioRD == 1'b0 ? vga_dout :
+                      cpuAddress[7:0] == vdp_ctrl_port && n_ioRD == 1'b0 ? status :
+		      cpuAddress[7:0] == psg_val_read_port && n_ioRD == 1'b0 && r_psg == 14 ? joystick :
 		      // Slot 1, page 1 is cartridge rom
-		      soft_sw[0] && cpuAddress[15:14] == 1   && n_memRD == 1'b0 && ppi_port_a[3:2] == 1 ? romOut :
+		      soft_sw[0] && cpuAddress[15:14] == 1 && n_memRD == 1'b0 && ppi_port_a[3:2] == 1 ? romOut :
 		      // Slot 1, page 2
-		      soft_sw[1] && cpuAddress[15:14] == 2   && n_memRD == 1'b0 && ppi_port_a[5:4] == 1 ? romOut :
+		      soft_sw[1] && cpuAddress[15:14] == 2 && n_memRD == 1'b0 && ppi_port_a[5:4] == 1 ? romOut :
 		      // Slot 0 only
                       ppi_port_a[(2 << cpuAddress[15:14]) - 1 -: 2] == 0 ? ramOut: 0;
 
@@ -509,8 +521,8 @@ module msx
       if (interrupt_flag) r_interrupt_flag <= 1;
       if (sprite_collision) r_sprite_collision <= 1;
       if (cpuClockEdge) begin
-        r_status_read <= cpuAddress[7:0] == 8'h99 && n_ioRD == 1'b0;
-        if (r_status_read && !(cpuAddress[7:0] == 8'h99 && n_ioRD == 1'b0)) begin
+        r_status_read <= cpuAddress[7:0] == vdp_ctrl_port && n_ioRD == 1'b0;
+        if (r_status_read && !(cpuAddress[7:0] == vdp_ctrl_port && n_ioRD == 1'b0)) begin
           r_interrupt_flag <= 0;
           r_sprite_collision <= 0;
         end
@@ -545,7 +557,7 @@ module msx
     .clk_en(cpuClockEnable),
     .addr(r_psg),
     .cs_n(1'b0),
-    .wr_n(n_ioWR || cpuAddress[7:0] != 8'ha1),
+    .wr_n(n_ioWR || cpuAddress[7:0] != psg_val_write_port),
     .din(cpuDataOut),
     .sel(1'b1),
     .sound(sound_10)
