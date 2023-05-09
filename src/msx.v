@@ -574,7 +574,22 @@ module msx
   // Audio
   // ===============================================================
   wire [9:0] sound_10;
-  assign audio_l = sound_10[7:4] | {2{ppi_port_c[7]}};
+  wire audio_pulse;
+  wire [9:0] dac_in;
+  
+  // Note: ppi_port_c[7] is the keyboard clicking sound
+  assign dac_in = {10{sound_10}} | {2'd0, {8{ppi_port_c[7]}}};
+
+  dac #(
+    .WIDTH(10)
+  ) dac(
+    .rst_n(n_hard_reset),
+    .clk(cpuClock),
+    .value(dac_in),
+    .pulse(audio_pulse)
+  );
+
+  assign audio_l = {audio_pulse, 3'd0};
   assign audio_r = audio_l;
 
   jt49 #(.CLKDIV(6)) audio (
