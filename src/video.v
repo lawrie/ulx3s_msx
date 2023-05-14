@@ -26,6 +26,7 @@ module video (
   input         sprite_large,
   input         sprite_enlarged,
   input         vert_retrace_int,
+  input         status_read,
   output        n_int,
   output        sprite_collision,
   output        too_many_sprites,
@@ -117,7 +118,6 @@ module video (
   reg [9:0] vc = 0;
 
   reg INT = 0;
-  reg [5:0] intCnt = 1;
 
   reg [7:0] r_char;
   reg [7:0] font_line;
@@ -150,7 +150,6 @@ module video (
   // vertical sync interrupt interrupt
   always @(posedge clk) begin
     if (reset) begin
-      intCnt <= 1;
       hc <= 0;
       vc <= 0;
     end else begin
@@ -160,8 +159,9 @@ module video (
         else vc <= vc + 1;
       end else hc <= hc + 1;
       if (hc == HA + HFP && vc == VA + VFP && vert_retrace_int) INT <= 1;
-      if (INT) intCnt <= intCnt + 1;
-      if (!intCnt) INT <= 0;
+      // Reset the interrupt flag after the status register is read
+      if (status_read)
+        INT <= 0;
     end
   end
 

@@ -436,6 +436,7 @@ module msx
       
   video vga (
     .clk(clk_vga),
+    .reset(!n_hard_reset),
     .vga_r(red),
     .vga_g(green),
     .vga_b(blue),
@@ -461,6 +462,7 @@ module msx
     .sprite_large(r_vdp[1][1]),
     .sprite_enlarged(r_vdp[1][0]),
     .vert_retrace_int(r_vdp[1][5]),
+    .status_read(r_status_read),
     .sprite_collision(sprite_collision),
     .too_many_sprites(too_many_sprites),
     .sprite5(sprite5),
